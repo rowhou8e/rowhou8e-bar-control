@@ -8,8 +8,8 @@ html, body {
 }
 
 body {
-  background-color: #F9FAFB;
-  color: #111827;
+  background-color: #0A0A0B;
+  color: #F5F5F7;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -39,3 +39,53 @@ input, select, textarea {
     padding-top: env(safe-area-inset-top);
   }
 }
+
+/* ============================================================
+   Black theme override — Row House
+   ============================================================ */
+::-webkit-scrollbar-thumb {
+  background: #3A3B42 !important;
+}
+
+.bg-white { background-color: #17181C !important; }
+.bg-gray-50 { background-color: #101114 !important; }
+.bg-gray-100 { background-color: #1C1D22 !important; }
+.bg-gray-200 { background-color: #26272D !important; }
+.bg-gray-900 { background-color: #000000 !important; }
+
+.text-gray-300 { color: #6B6B70 !important; }
+.text-gray-400 { color: #8A8A8F !important; }
+.text-gray-500 { color: #9C9CA1 !important; }
+.text-gray-600 { color: #AEAEB3 !important; }
+.text-gray-700 { color: #C7C7CC !important; }
+.text-gray-800 { color: #E0E0E3 !important; }
+.text-gray-900 { color: #F5F5F7 !important; }
+
+.border-gray-50 { border-color: #1A1B1F !important; }
+.border-gray-100 { border-color: #232429 !important; }
+.border-gray-200 { border-color: #2C2D33 !important; }
+.border-gray-300 { border-color: #3A3B42 !important; }
+.border-gray-400 { border-color: #4A4B54 !important; }
+.ring-gray-100 { --tw-ring-color: #232429 !important; }
+
+.bg-purple-50 { background-color: rgba(167,139,250,0.12) !important; }
+.border-purple-400 { border-color: #A78BFA !important; }
+.text-purple-600 { color: #C4B5FD !important; }
+
+.bg-red-50 { background-color: rgba(248,113,113,0.12) !important; }
+.bg-red-200 { background-color: rgba(248,113,113,0.24) !important; }
+.border-red-500 { border-color: #F87171 !important; }
+.text-red-600 { color: #FCA5A5 !important; }
+
+.bg-sky-50 { background-color: rgba(56,189,248,0.12) !important; }
+.bg-sky-600 { background-color: #0284C7 !important; }
+.bg-sky-700 { background-color: #075985 !important; }
+.border-sky-400 { border-color: #38BDF8 !important; }
+.text-sky-600 { color: #7DD3FC !important; }
+
+.bg-brand-50 { background-color: rgba(249,115,22,0.10) !important; }
+.bg-brand-100 { background-color: rgba(249,115,22,0.18) !important; }
+.border-brand-200 { border-color: rgba(249,115,22,0.35) !important; }
+.border-brand-300 { border-color: rgba(249,115,22,0.55) !important; }
+.text-brand-600 { color: #FB923C !important; }
+.text-brand-700 { color: #F97316 !important; }

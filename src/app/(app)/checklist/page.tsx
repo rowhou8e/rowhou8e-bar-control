@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { Header } from '@/components/Header';
 import { EmptyState, PrimaryButton } from '@/components/ui';
-import { formatThaiDate, formatThaiTime, getEmployeeName, isChecklistOverdue, toDateStr } from '@/lib/derive';
+import { formatThaiDate, formatThaiTime, getEmployeeName, isChecklistItemScheduledToday, isChecklistOverdue, toDateStr } from '@/lib/derive';
 
 export default function ChecklistPage() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function ChecklistPage() {
               const todayRun = checklistRuns.find((r) => r.stationId === station.id && r.date === todayStr);
               const overdue = isChecklistOverdue(settings, todayRun, now, storeHolidays);
               const isMine = station.id === myStationId;
-              const itemCount = checklistTemplate.filter((t) => t.stationId === station.id && t.active).length;
+              const itemCount = checklistTemplate.filter((t) => t.stationId === station.id && t.active && isChecklistItemScheduledToday(t, now)).length;
 
               return (
                 <div

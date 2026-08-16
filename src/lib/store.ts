@@ -43,6 +43,7 @@ import type {
   AppStore,
   CashReport,
   ChecklistEntryItem,
+  ChecklistItemFrequency,
   ChecklistRun,
   ChecklistTemplateItem,
   Employee,
@@ -925,7 +926,14 @@ class Store {
   }
 
   // ================= จัดการรายการเช็กลิสต์ =================
-  createChecklistTemplateItem(input: { stationId: string; label: string; actorId: string }) {
+  createChecklistTemplateItem(input: {
+    stationId: string;
+    label: string;
+    actorId: string;
+    frequency?: ChecklistItemFrequency;
+    weeklyDays?: number[] | null;
+    monthlyDay?: number | null;
+  }) {
     this.update((s) => {
       const stationItems = s.checklistTemplate.filter((t) => t.stationId === input.stationId);
       const nextOrder = stationItems.length > 0 ? Math.max(...stationItems.map((t) => t.order)) + 1 : 0;
@@ -935,6 +943,9 @@ class Store {
         label: input.label,
         order: nextOrder,
         active: true,
+        frequency: input.frequency ?? 'daily',
+        weeklyDays: input.weeklyDays ?? null,
+        monthlyDay: input.monthlyDay ?? null,
       };
       const station = s.stations.find((st) => st.id === input.stationId);
       this.log(
@@ -947,7 +958,11 @@ class Store {
     });
   }
 
-  updateChecklistTemplateItem(id: string, patch: { label?: string }, actorId: string) {
+  updateChecklistTemplateItem(
+    id: string,
+    patch: { label?: string; frequency?: ChecklistItemFrequency; weeklyDays?: number[] | null; monthlyDay?: number | null },
+    actorId: string
+  ) {
     this.update((s) => {
       const templates = s.checklistTemplate.map((t) => (t.id === id ? { ...t, ...patch } : t));
       const t = s.checklistTemplate.find((x) => x.id === id);

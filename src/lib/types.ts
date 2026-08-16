@@ -88,12 +88,20 @@ export type ChecklistItemStatus =
 /** สถานะกลุ่มนี้ต้องบังคับถ่ายรูป + ระบุเหตุผล + ระบุจำนวน + แจ้งผู้จัดการ (สเปก §7) */
 export const RISKY_CHECKLIST_STATUSES: ChecklistItemStatus[] = ['expired', 'unusable', 'production_failed'];
 
+export type ChecklistItemFrequency = 'daily' | 'weekly' | 'monthly';
+
 export interface ChecklistTemplateItem {
   id: string;
   stationId: string; // แต่ละแผนกมีรายการเช็กลิสต์เป็นของตัวเอง
   label: string;
   order: number;
   active: boolean;
+  /** ความถี่ในการทำ: daily = ทุกวัน (ค่าเริ่มต้น), weekly = เลือกวันในสัปดาห์, monthly = เลือกวันที่ของเดือน */
+  frequency?: ChecklistItemFrequency;
+  /** ใช้เมื่อ frequency = 'weekly' — เลข 0-6 (0=อาทิตย์ ... 6=เสาร์) */
+  weeklyDays?: number[] | null;
+  /** ใช้เมื่อ frequency = 'monthly' — วันที่ 1-31 ของเดือน */
+  monthlyDay?: number | null;
 }
 
 export interface ChecklistEntryItem {
@@ -507,8 +515,19 @@ export interface AppStore {
   deleteStation(id: string, actorId: string): void | Promise<void>;
 
   // ================= จัดการรายการเช็กลิสต์ (owner/manager เท่านั้น — ดูการจำกัดสิทธิ์ที่หน้าจอ + RLS) =================
-  createChecklistTemplateItem(input: { stationId: string; label: string; actorId: string }): void | Promise<void>;
-  updateChecklistTemplateItem(id: string, patch: { label?: string }, actorId: string): void | Promise<void>;
+  createChecklistTemplateItem(input: {
+    stationId: string;
+    label: string;
+    actorId: string;
+    frequency?: ChecklistItemFrequency;
+    weeklyDays?: number[] | null;
+    monthlyDay?: number | null;
+  }): void | Promise<void>;
+  updateChecklistTemplateItem(
+    id: string,
+    patch: { label?: string; frequency?: ChecklistItemFrequency; weeklyDays?: number[] | null; monthlyDay?: number | null },
+    actorId: string
+  ): void | Promise<void>;
   deleteChecklistTemplateItem(id: string, actorId: string): void | Promise<void>;
 
   // ================= จัดการสินค้าที่ผลิต (owner/manager เท่านั้น) =================

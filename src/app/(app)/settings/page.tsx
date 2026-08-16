@@ -9,7 +9,7 @@ import { Header } from '@/components/Header';
 import { PrimaryButton, SectionTitle } from '@/components/ui';
 import { getDataMode } from '@/lib/supabase/client';
 import { formatThaiDate, formatThaiDateTime, roleLabel } from '@/lib/derive';
-import type { ChecklistTemplateItem, Product, Role, Station, StockCategory, StockItem, StoreHoliday, Supplier, SupplierItemPrice } from '@/lib/types';
+import type { ChecklistItemFrequency, ChecklistTemplateItem, Product, Role, Station, StockCategory, StockItem, StoreHoliday, Supplier, SupplierItemPrice } from '@/lib/types';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -738,6 +738,27 @@ function ChecklistStationBlock({
   );
 }
 
+const WEEKDAY_LABELS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+const FREQUENCY_OPTIONS: { value: ChecklistItemFrequency; label: string }[] = [
+  { value: 'daily', label: 'ทุกวัน' },
+  { value: 'weekly', label: 'รายสัปดาห์' },
+  { value: 'monthly', label: 'รายเดือน' },
+];
+
+function describeChecklistItemSchedule(item: ChecklistTemplateItem): string {
+  const frequency = item.frequency ?? 'daily';
+  if (frequency === 'weekly') {
+    const days = item.weeklyDays ?? [];
+    if (days.length === 0) return 'รายสัปดาห์ (ยังไม่เลือกวัน)';
+    return `ทุก ${days.map((d) => WEEKDAY_LABELS[d]).join(' ')}`;
+  }
+  if (frequency === 'monthly') {
+    return `วันที่ ${item.monthlyDay ?? 1} ของเดือน`;
+  }
+  return 'ทุกวัน';
+}
+
 function ChecklistItemRow({
   item,
   employeeId,
@@ -749,48 +770,99 @@ function ChecklistItemRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(item.label);
+  const [frequency, setFrequency] = useState<ChecklistItemFrequency>(item.frequency ?? 'daily');
+  const [weeklyDays, setWeeklyDays] = useState<number[]>(item.weeklyDays ?? []);
+  const [monthlyDay, setMonthlyDay] = useState<number>(item.monthlyDay ?? 1);
 
   function handleSave() {
     if (!label.trim()) return;
-    store.updateChecklistTemplateItem(item.id, { label: label.trim() }, employeeId);
+    store.updateChecklistTemplateItem(
+      item.id,
+      {
+        label: label.trim(),
+        frequency,
+        weeklyDays: frequency === 'weekly' ? weeklyDays : null,
+        monthlyDay: frequency === 'monthly' ? monthlyDay : null,
+      },
+      employeeId
+    );
     setEditing(false);
+  }
+
+  function toggleWeeklyDay(day: number) {
+    setWeeklyDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
   }
 
   if (editing) {
     return (
-      <li className="flex items-center gap-1.5 py-0.5">
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          autoFocus
-          className="flex-1 rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none focus:border-brand-400"
-        />
-        <button onClick={handleSave} className="shrink-0 rounded-md bg-brand-600 px-2 py-1 text-[10px] font-bold text-white">
-          บันทึก
-        </button>
-        <button
-          onClick={() => {
-            setLabel(item.label);
-            setEditing(false);
-          }}
-          className="shrink-0 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-500"
-        >
-          ยกเลิก
-        </button>
+      <li className="flex flex-col gap-1.5 rounded-lg bg-gray-50 px-2 py-1.5">
+        <input value={label} onChange={(e) => setLabel(e.target.value)} autoFocus className="flex-1 rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none focus:border-brand-400" />
+        <div className="flex flex-wrap gap-1">
+          {FREQUENCY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setFrequency(opt.value)}
+              className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${frequency === opt.value ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {frequency === 'weekly' && (
+          <div className="flex flex-wrap gap-1">
+            {WEEKDAY_LABELS.map((d, idx) => (
+              <button
+                key={idx}
+                onClick={() => toggleWeeklyDay(idx)}
+                className={`h-6 w-6 rounded-full text-[10px] font-semibold ${weeklyDays.includes(idx) ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        )}
+        {frequency === 'monthly' && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-gray-500">วันที่</span>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={monthlyDay}
+              onChange={(e) => setMonthlyDay(Math.min(31, Math.max(1, Number(e.target.value) || 1)))}
+              className="w-14 rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none focus:border-brand-400"
+            />
+            <span className="text-[10px] text-gray-500">ของเดือน</span>
+          </div>
+        )}
+        <div className="flex gap-1.5">
+          <button onClick={handleSave} className="shrink-0 rounded-md bg-brand-600 px-2 py-1 text-[10px] font-bold text-white">บันทึก</button>
+          <button
+            onClick={() => {
+              setLabel(item.label);
+              setFrequency(item.frequency ?? 'daily');
+              setWeeklyDays(item.weeklyDays ?? []);
+              setMonthlyDay(item.monthlyDay ?? 1);
+              setEditing(false);
+            }}
+            className="shrink-0 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-500"
+          >
+            ยกเลิก
+          </button>
+        </div>
       </li>
     );
   }
 
   return (
     <li className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
-      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate">
+        {item.label}
+        <span className="ml-1.5 text-[10px] text-gray-400">{describeChecklistItemSchedule(item)}</span>
+      </span>
       <span className="flex shrink-0 gap-1">
-        <button onClick={() => setEditing(true)} className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
-          แก้ไข
-        </button>
-        <button onClick={onDelete} className="rounded-md bg-status-dangerBg px-1.5 py-0.5 text-[10px] font-semibold text-status-danger">
-          ลบ
-        </button>
+        <button onClick={() => setEditing(true)} className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">แก้ไข</button>
+        <button onClick={onDelete} className="rounded-md bg-status-dangerBg px-1.5 py-0.5 text-[10px] font-semibold text-status-danger">ลบ</button>
       </span>
     </li>
   );

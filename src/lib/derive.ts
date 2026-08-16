@@ -8,6 +8,7 @@ import type {
   AppSettings,
   CashReport,
   ChecklistRun,
+  ChecklistTemplateItem,
   Employee,
   ItemStatus,
   NotificationSeverity,
@@ -181,6 +182,18 @@ export function isChecklistOverdue(
   const due = new Date(now);
   due.setHours(h, m, 0, 0);
   return now.getTime() > due.getTime();
+}
+
+/** คืนค่าว่ารายการเช็กลิสต์นี้ควรทำ "วันนี้" หรือไม่ ตามความถี่ที่ตั้งไว้ (ทุกวัน/รายสัปดาห์/รายเดือน) */
+export function isChecklistItemScheduledToday(item: ChecklistTemplateItem, now: Date): boolean {
+  const frequency = item.frequency ?? 'daily';
+  if (frequency === 'weekly') {
+    return (item.weeklyDays ?? []).includes(now.getDay());
+  }
+  if (frequency === 'monthly') {
+    return item.monthlyDay != null && now.getDate() === item.monthlyDay;
+  }
+  return true;
 }
 
 /** สร้างรายการแจ้งเตือนแบบ "คำนวณสด" จากสถานะปัจจุบันของระบบทั้งหมด

@@ -15,6 +15,7 @@ import type {
   AppSettings,
   CashReport,
   ChecklistEntryItem,
+  ChecklistItemFrequency,
   ChecklistRun,
   ChecklistTemplateItem,
   Employee,
@@ -373,6 +374,9 @@ export async function fetchChecklistTemplateItems(): Promise<ChecklistTemplateIt
     label: r.label,
     order: r.sort_order,
     active: r.active,
+    frequency: r.frequency ?? 'daily',
+    weeklyDays: r.weekly_days ?? null,
+    monthlyDay: r.monthly_day ?? null,
   }));
 }
 
@@ -381,6 +385,9 @@ export async function createChecklistTemplateItem(input: {
   stationId: string;
   label: string;
   actorId: string;
+  frequency?: ChecklistItemFrequency;
+  weeklyDays?: number[] | null;
+  monthlyDay?: number | null;
 }): Promise<ChecklistTemplateItem> {
   const sb = getSupabaseClient();
   const { data: existing } = await sb
@@ -393,7 +400,15 @@ export async function createChecklistTemplateItem(input: {
 
   const { data, error } = await sb
     .from('checklist_template_items')
-    .insert({ station_id: input.stationId, label: input.label, sort_order: nextOrder, active: true })
+    .insert({
+      station_id: input.stationId,
+      label: input.label,
+      sort_order: nextOrder,
+      active: true,
+      frequency: input.frequency ?? 'daily',
+      weekly_days: input.weeklyDays ?? null,
+      monthly_day: input.monthlyDay ?? null,
+    })
     .select()
     .single();
   if (error) throw error;
@@ -406,14 +421,30 @@ export async function createChecklistTemplateItem(input: {
     detail: `เพิ่มรายการเช็กลิสต์ใหม่: ${input.label}`,
   });
 
-  return { id: data.id, stationId: data.station_id, label: data.label, order: data.sort_order, active: data.active };
+  return {
+    id: data.id,
+    stationId: data.station_id,
+    label: data.label,
+    order: data.sort_order,
+    active: data.active,
+    frequency: data.frequency ?? 'daily',
+    weeklyDays: data.weekly_days ?? null,
+    monthlyDay: data.monthly_day ?? null,
+  };
 }
 
 /** แก้ไขข้อความรายการเช็กลิสต์ */
-export async function updateChecklistTemplateItem(id: string, patch: { label?: string }, actorId: string) {
+export async function updateChecklistTemplateItem(
+  id: string,
+  patch: { label?: string; frequency?: ChecklistItemFrequency; weeklyDays?: number[] | null; monthlyDay?: number | null },
+  actorId: string
+) {
   const sb = getSupabaseClient();
   const dbPatch: Record<string, unknown> = {};
   if (patch.label !== undefined) dbPatch.label = patch.label;
+  if (patch.frequency !== undefined) dbPatch.frequency = patch.frequency;
+  if (patch.weeklyDays !== undefined) dbPatch.weekly_days = patch.weeklyDays;
+  if (patch.monthlyDay !== undefined) dbPatch.monthly_day = patch.monthlyDay;
 
   const { error } = await sb.from('checklist_template_items').update(dbPatch).eq('id', id);
   if (error) throw error;

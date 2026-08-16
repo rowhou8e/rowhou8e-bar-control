@@ -17,7 +17,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseClient } from './client';
 import * as q from './queries';
 import { detectDeviceLabel } from '../device';
-import type { AppSettings, AppState, ChecklistEntryItem, ProductLotStatus, PurchaseOrderStatus, PurchaseRequestStatus, Role } from '../types';
+import type { AppSettings, AppState, ChecklistEntryItem, ChecklistItemFrequency, ProductLotStatus, PurchaseOrderStatus, PurchaseRequestStatus, Role } from '../types';
 
 /** ตารางที่เปิด Postgres Changes ไว้ (ดู schema.sql ส่วน "9) REALTIME") — subscribe เพื่อให้ทุกหน้าจอ
  *  ที่เปิดค้างไว้อัปเดตสดทันทีเมื่อมีคนอื่นบันทึกข้อมูล โดยไม่ต้องรีเฟรชเอง — เฟส 4
@@ -621,12 +621,23 @@ export class LiveStore {
   }
 
   // ================= จัดการรายการเช็กลิสต์ =================
-  async createChecklistTemplateItem(input: { stationId: string; label: string; actorId: string }) {
+  async createChecklistTemplateItem(input: {
+    stationId: string;
+    label: string;
+    actorId: string;
+    frequency?: ChecklistItemFrequency;
+    weeklyDays?: number[] | null;
+    monthlyDay?: number | null;
+  }) {
     await q.createChecklistTemplateItem(input);
     await this.refetchAll();
   }
 
-  async updateChecklistTemplateItem(id: string, patch: { label?: string }, actorId: string) {
+  async updateChecklistTemplateItem(
+    id: string,
+    patch: { label?: string; frequency?: ChecklistItemFrequency; weeklyDays?: number[] | null; monthlyDay?: number | null },
+    actorId: string
+  ) {
     await q.updateChecklistTemplateItem(id, patch, actorId);
     await this.refetchAll();
   }

@@ -6,7 +6,7 @@ import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { EmptyState, PhotoAttach, PrimaryButton } from '@/components/ui';
-import { toDateStr } from '@/lib/derive';
+import { isChecklistItemScheduledToday, toDateStr } from '@/lib/derive';
 import { RISKY_CHECKLIST_STATUSES } from '@/lib/types';
 import type { ChecklistEntryItem, ChecklistItemStatus } from '@/lib/types';
 
@@ -44,7 +44,7 @@ function NewChecklistForm() {
 
   const stationId = params.get('station') ?? employee?.stationId ?? '';
   const station = stations.find((s) => s.id === stationId);
-  const activeItems = checklistTemplate.filter((t) => t.stationId === stationId && t.active).sort((a, b) => a.order - b.order);
+  const activeItems = checklistTemplate.filter((t) => t.stationId === stationId && t.active && isChecklistItemScheduledToday(t, now)).sort((a, b) => a.order - b.order);
 
   const todayStr = toDateStr(now);
   const canBackdate = employee?.role === 'owner' || employee?.role === 'manager';

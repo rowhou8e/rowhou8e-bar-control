@@ -14,6 +14,10 @@ export default function LoginPage() {
   const isLive = getDataMode() === 'supabase';
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      router.replace('/reset-password' + window.location.hash);
+      return;
+    }
     if (!initializing && session) router.replace('/dashboard');
   }, [initializing, session, router]);
 

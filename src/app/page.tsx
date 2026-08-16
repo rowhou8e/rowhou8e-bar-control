@@ -9,6 +9,10 @@ export default function RootPage() {
   const { session } = useAppState();
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      router.replace('/reset-password' + window.location.hash);
+      return;
+    }
     router.replace(session ? '/dashboard' : '/login');
   }, [session, router]);
 

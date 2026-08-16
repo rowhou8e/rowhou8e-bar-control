@@ -89,3 +89,17 @@ input, select, textarea {
 .border-brand-300 { border-color: rgba(249,115,22,0.55) !important; }
 .text-brand-600 { color: #FB923C !important; }
 .text-brand-700 { color: #F97316 !important; }
+
+/* Fix invisible text in form inputs on dark theme */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  background-color: #17181C !important;
+  color: #F5F5F7 !important;
+  border-color: #3A3B42 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6B6B70 !important;
+}

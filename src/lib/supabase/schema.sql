@@ -324,7 +324,8 @@ create table if not exists public.history_logs (
     'checklist_submit', 'production_log', 'lot_status_change', 'stock_adjust',
     'waste_report', 'purchase_create', 'purchase_approve', 'purchase_receive',
     'settings_change', 'supplier_change', 'po_create', 'po_status_change',
-    'cash_report_submit'
+    'cash_report_submit', 'cash_report_edit', 'order_reminder_send', 'order_reminder_ack',
+    'po_price_update'
   )),
   actor_id uuid references public.employees (id),
   target_label text not null,

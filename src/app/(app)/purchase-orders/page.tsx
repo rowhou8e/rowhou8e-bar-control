@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { Header } from '@/components/Header';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
-import { EmptyState, PrimaryButton } from '@/components/ui';
+import { EmptyState, PrimaryButton, SecondaryButton } from '@/components/ui';
 import { formatThaiDate } from '@/lib/derive';
 import type { PurchaseOrderStatus } from '@/lib/types';
 
@@ -34,13 +34,18 @@ export default function PurchaseOrdersPage() {
     <div>
       <Header title="ใบสั่งซื้อ" subtitle="รวมรายการเสนอซื้อที่อนุมัติแล้วเป็นใบสั่งซื้อต่อผู้ขาย" currentEmployee={employee} />
       <main className="space-y-4 px-4 py-4">
-        {canManage && (
-          <div>
-            <PrimaryButton onClick={() => router.push('/order')}>+ สั่งสินค้าเพิ่ม</PrimaryButton>
+        <div className="flex gap-2">
+            {canManage && (
+              <PrimaryButton onClick={() => router.push('/order')} className="flex-1">
+                + สั่งสินค้าเพิ่ม
+              </PrimaryButton>
+            )}
+            <SecondaryButton onClick={() => router.push('/purchase-orders/report')} className={canManage ? '' : 'flex-1'}>
+              ดูสรุปรายเดือน
+            </SecondaryButton>
           </div>
-        )}
 
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
           {TABS.map((t) => (
             <button
               key={t.value}

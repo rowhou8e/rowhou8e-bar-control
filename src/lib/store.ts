@@ -823,6 +823,32 @@ class Store {
     });
   }
 
+  /** แก้ไขราคาต่อหน่วยของรายการสินค้าในใบสั่งซื้อ — ใช้ได้เฉพาะใบสั่งซื้อที่ยังเป็นสถานะ "ร่าง" เท่านั้น (ก่อนส่งให้ผู้ขาย) */
+  updatePurchaseOrderItemPrice(purchaseOrderId: string, itemId: string, unitPrice: number, actorId: string) {
+    this.update((s) => {
+      const order = s.purchaseOrders.find((po) => po.id === purchaseOrderId);
+      if (!order || order.status !== 'draft') return s;
+      const item = order.items.find((it) => it.id === itemId);
+      if (!item) return s;
+
+      const purchaseOrders = s.purchaseOrders.map((po) =>
+        po.id === purchaseOrderId
+          ? { ...po, items: po.items.map((it) => (it.id === itemId ? { ...it, unitPrice } : it)) }
+          : po
+      );
+
+      const supplier = s.suppliers.find((x) => x.id === order.supplierId);
+      this.log(
+        'po_price_update',
+        actorId,
+        `ใบสั่งซื้อ · ${supplier?.name ?? order.supplierId}`,
+        `แก้ไขราคา "${item.itemName}" เป็น ${unitPrice.toLocaleString()} บาท/${item.unit}`
+      );
+
+      return { ...s, purchaseOrders };
+    });
+  }
+
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   /** บันทึกรายงานเงินสดของวันที่ระบุ */
   submitCashReport(input: { date: string; closingAmount: number; note: string; actorId: string }) {

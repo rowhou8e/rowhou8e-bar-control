@@ -287,6 +287,7 @@ export type HistoryActionType =
   | 'supplier_change' // เพิ่ม/แก้ไขผู้ขาย หรือเพิ่มราคาใหม่
   | 'po_create' // สร้าง/รวมใบสั่งซื้อ
   | 'po_status_change' // เปลี่ยนสถานะใบสั่งซื้อ (ส่งแล้ว/ยืนยันแล้ว/รับแล้ว/ยกเลิก)
+  | 'po_price_update' // แก้ไขราคาต่อหน่วยของรายการในใบสั่งซื้อ (ระหว่างสถานะร่าง)
   | 'cash_report_submit' // บันทึกรายงานเงินสดปิดร้าน — เฟส 3
   | 'cash_report_edit' // แก้ไขรายงานเงินสดปิดร้านที่บันทึกไว้แล้ว
   | 'order_reminder_send' // เจ้าของ/ผู้จัดการส่งแจ้งเตือนให้แผนกสั่งสินค้า — เฟส 5
@@ -587,6 +588,7 @@ export interface AppStore {
    * และตั้งสถานะรายการเสนอซื้อต้นทางทั้งหมดในใบนี้เป็น "received" ด้วย
    */
   updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, actorId: string): void | Promise<void>;
+  updatePurchaseOrderItemPrice(purchaseOrderId: string, itemId: string, unitPrice: number, actorId: string): void | Promise<void>;
 
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   /** บันทึกรายงานเงินสดของวันที่ระบุ */

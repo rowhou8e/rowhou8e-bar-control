@@ -103,3 +103,19 @@ input::placeholder,
 textarea::placeholder {
   color: #6B6B70 !important;
 }
+
+/* พิมพ์รายงาน — ซ่อนแถบเมนูบนล่างและอุปกรณ์ควบคุมหน้าจอ, ให้เหลือแต่เนื้อหารายงาน */
+@media print {
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}

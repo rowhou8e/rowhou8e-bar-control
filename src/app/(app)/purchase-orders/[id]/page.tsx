@@ -55,6 +55,15 @@ export default function PurchaseOrderDetailPage() {
     store.updatePurchaseOrderStatus(po!.id, 'cancelled', employee.id);
   }
 
+  function handlePriceCommit(itemId: string, rawValue: string) {
+    if (!employee) return;
+    const price = Number(rawValue);
+    if (!Number.isFinite(price) || price < 0) return;
+    const original = po!.items.find((it) => it.id === itemId)?.unitPrice;
+    if (original === price) return;
+    store.updatePurchaseOrderItemPrice(po!.id, itemId, price, employee.id);
+  }
+
   async function handleDownloadImage() {
     if (!po || generatingImage) return;
     setGeneratingImage(true);
@@ -120,14 +129,35 @@ export default function PurchaseOrderDetailPage() {
 
         <div className="rounded-2xl bg-white p-4 shadow-card">
           <p className="mb-2 text-xs font-bold text-gray-700">รายการสินค้า ({po.items.length} รายการ)</p>
+          {po.status === 'draft' && (
+            <p className="-mt-1 mb-2 text-[11px] text-gray-400">แตะที่ราคาเพื่อแก้ไขให้ตรงกับราคาที่ซื้อจริง ก่อนส่งให้ผู้ขาย</p>
+          )}
           <div className="space-y-2">
             {po.items.map((it) => (
               <div key={it.id} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs last:border-0 last:pb-0">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-gray-800">{it.itemName}</p>
-                  <p className="text-gray-400">
-                    {it.quantity} {it.unit} × {it.unitPrice.toLocaleString()} บาท
-                  </p>
+                  {po.status === 'draft' ? (
+                    <div className="mt-1 flex items-center gap-1 text-gray-400">
+                      <span>
+                        {it.quantity} {it.unit} ×
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        defaultValue={it.unitPrice}
+                        onBlur={(e) => handlePriceCommit(it.id, e.target.value)}
+                        className="w-20 rounded-lg border border-gray-200 px-1.5 py-0.5 text-right text-xs text-gray-700"
+                      />
+                      <span>บาท</span>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400">
+                      {it.quantity} {it.unit} × {it.unitPrice.toLocaleString()} บาท
+                    </p>
+                  )}
                 </div>
                 <p className="shrink-0 font-bold text-gray-700">{(it.quantity * it.unitPrice).toLocaleString()} บาท</p>
               </div>

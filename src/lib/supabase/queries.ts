@@ -1152,6 +1152,36 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
   return order;
 }
 
+export async function updatePurchaseOrderItemPrice(purchaseOrderId: string, itemId: string, unitPrice: number, actorId: string) {
+  const sb = getSupabaseClient();
+
+  const { data: order, error: orderError } = await sb
+    .from('purchase_orders')
+    .select('id, status, supplier_id')
+    .eq('id', purchaseOrderId)
+    .single();
+  if (orderError) throw orderError;
+  if (!order || order.status !== 'draft') throw new Error('แก้ไขราคาได้เฉพาะใบสั่งซื้อสถานะร่างเท่านั้น');
+
+  const { data: item, error: itemError } = await sb
+    .from('purchase_order_items')
+    .select('item_name, unit')
+    .eq('id', itemId)
+    .single();
+  if (itemError) throw itemError;
+
+  const { error } = await sb.from('purchase_order_items').update({ unit_price: unitPrice }).eq('id', itemId);
+  if (error) throw error;
+
+  const { data: supplier } = await sb.from('suppliers').select('name').eq('id', order.supplier_id).single();
+  await sb.from('history_logs').insert({
+    action_type: 'po_price_update',
+    actor_id: actorId,
+    target_label: `ใบสั่งซื้อ · ${supplier?.name ?? order.supplier_id}`,
+    detail: `แก้ไขราคา "${item?.item_name ?? itemId}" เป็น ${unitPrice.toLocaleString()} บาท/${item?.unit ?? ''}`,
+  });
+}
+
 // ================= รายงานเงินสดปิดร้าน (แบบง่าย — append-only) — เฟส 3 =================
 export async function fetchCashReports(): Promise<CashReport[]> {
   const sb = getSupabaseClient();

@@ -216,10 +216,25 @@ create policy "purchase_order_items_insert_any_staff"
   on public.purchase_order_items for insert
   with check (public.current_employee_role() in ('owner', 'manager', 'staff'));
 
-create policy "purchase_order_items_update_owner_manager"
+-- พนักงานทุกตำแหน่งแก้ไขได้ (เช่น แก้ราคาต่อหน่วย) แต่จำกัดเฉพาะใบสั่งซื้อที่ยังเป็นสถานะ "ร่าง" เท่านั้น
+create policy "purchase_order_items_update_any_staff_draft"
   on public.purchase_order_items for update
-  using (public.current_employee_role() in ('owner', 'manager'))
-  with check (public.current_employee_role() in ('owner', 'manager'));
+  using (
+    public.current_employee_role() in ('owner', 'manager', 'staff')
+    and exists (
+      select 1 from public.purchase_orders po
+      where po.id = purchase_order_items.purchase_order_id
+        and po.status = 'draft'
+    )
+  )
+  with check (
+    public.current_employee_role() in ('owner', 'manager', 'staff')
+    and exists (
+      select 1 from public.purchase_orders po
+      where po.id = purchase_order_items.purchase_order_id
+        and po.status = 'draft'
+    )
+  );
 
 create policy "purchase_order_items_delete_owner_manager"
   on public.purchase_order_items for delete

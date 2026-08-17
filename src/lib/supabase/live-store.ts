@@ -556,6 +556,11 @@ export class LiveStore {
     await this.refetchAll();
   }
 
+  async updatePurchaseOrderItemPrice(purchaseOrderId: string, itemId: string, unitPrice: number, actorId: string) {
+    await q.updatePurchaseOrderItemPrice(purchaseOrderId, itemId, unitPrice, actorId);
+    await this.refetchAll();
+  }
+
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   async submitCashReport(input: { date: string; closingAmount: number; note: string; actorId: string }) {
     await q.submitCashReport(input);

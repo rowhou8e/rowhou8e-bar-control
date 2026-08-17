@@ -484,6 +484,8 @@ export default function OrderPage() {
               >
                 {addingItem ? 'กำลังบันทึก...' : 'บันทึกวัตถุดิบใหม่'}
               </button>
+            </div>
+          )}
               {showImportItems && (
               <div className="mt-2 space-y-2 rounded-xl bg-gray-50 p-3">
                 <div className="flex items-center justify-between gap-2">
@@ -540,8 +542,6 @@ export default function OrderPage() {
               </div>
             )}
             <p className="text-[11px] text-gray-400">วัตถุดิบใหม่จะเข้าคลังกลาง เจ้าของ/ผู้จัดการเป็นผู้กำหนดผู้ขายภายหลังที่หน้า &quot;ตั้งค่าระบบ&quot;</p>
-            </div>
-          )}
         </div>
 
         {unassignedCount > 0 && (

@@ -583,7 +583,7 @@ export default function OrderPage() {
       )}
 
       <PrimaryButton onClick={handleSubmit} disabled={!valid || submitting}>
-          {`บันทึกการสั่งซื้อ (${selectedItems.length} รายการ)`}
+          {`บันทึกการสั่งซื้อ (${selectedItems.length + customItems.length} รายการ)`}
         </PrimaryButton>
       </main>
     </div>

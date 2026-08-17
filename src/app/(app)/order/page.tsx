@@ -41,6 +41,13 @@ export default function OrderPage() {
   const [addingItem, setAddingItem] = useState(false);
   const [addItemError, setAddItemError] = useState('');
 
+  // ค่าใช้จ่ายอื่นๆ — รายการที่ไม่ใช่วัตถุดิบในสต็อก พนักงานกรอกชื่อ+ราคาเอง (เช่น ค่าเดินทาง ค่าน้ำแข็ง ค่าถุง)
+  const [customItems, setCustomItems] = useState<Array<{ id: string; supplierId: string; name: string; unitPrice: string }>>([]);
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [newExpenseName, setNewExpenseName] = useState('');
+  const [newExpensePrice, setNewExpensePrice] = useState('');
+  const [expenseError, setExpenseError] = useState('');
+
   // ซ่อนรายการที่เจ้าของ/ผู้จัดการยังไม่ได้กำหนดผู้ขายไว้ — พนักงานสั่งซื้อรายการเหล่านี้ไม่ได้
   const orderableItems = useMemo(() => stockItems.filter((it) => !!it.supplierId), [stockItems]);
   const unassignedCount = stockItems.length - orderableItems.length;
@@ -141,14 +148,35 @@ export default function OrderPage() {
   }
 
   const grandTotal = groupList.reduce((sum, [, items]) => sum + groupTotal(items), 0);
-  const valid = selectedItems.length > 0 && !!orderDate;
+
+  const customItemsForSupplier = useMemo(
+    () => customItems.filter((c) => c.supplierId === currentSupplierId),
+    [customItems, currentSupplierId]
+  );
+  function customItemAmount(c: { unitPrice: string }) {
+    return Number(c.unitPrice) || 0;
+  }
+  function customTotalForSupplier(supplierId: string) {
+    return customItems.filter((c) => c.supplierId === supplierId).reduce((sum, c) => sum + customItemAmount(c), 0);
+  }
+  const customExpenseGrandTotal = customItems.reduce((sum, c) => sum + customItemAmount(c), 0);
+  const orderSupplierIds = useMemo(
+    () => Array.from(new Set<string>([...groupList.map(([id]) => id), ...customItems.map((c) => c.supplierId)])),
+    [groupList, customItems]
+  );
+  const valid = (selectedItems.length > 0 || customItems.length > 0) && !!orderDate;
 
   async function handleSubmit() {
     if (!employee || !valid) return;
     setSubmitting(true);
     try {
-      for (const [supplierId, items] of groupList) {
-        const orderItems = items.map((it) => ({
+      const supplierIds = new Set<string>([
+        ...groupList.map(([supplierId]) => supplierId),
+        ...customItems.map((c) => c.supplierId),
+      ]);
+      for (const supplierId of supplierIds) {
+        const stockGroup = groupList.find(([id]) => id === supplierId)?.[1] ?? [];
+        const orderItems = stockGroup.map((it) => ({
           stockItemId: it.id,
           itemName: it.name,
           quantity: Number(qty[it.id]) || 0,
@@ -156,12 +184,54 @@ export default function OrderPage() {
           unitPrice: Number(effectivePrice(it)) || 0,
           sourcePurchaseRequestId: null,
         }));
-        await store.createOrMergePurchaseOrder({ supplierId, orderDate, items: orderItems, actorId: employee.id });
+        const expenseItems = customItems
+          .filter((c) => c.supplierId === supplierId)
+          .map((c) => ({
+            stockItemId: null,
+            itemName: c.name,
+            quantity: 1,
+            unit: 'รายการ',
+            unitPrice: customItemAmount(c),
+            sourcePurchaseRequestId: null,
+          }));
+        await store.createOrMergePurchaseOrder({
+          supplierId,
+          orderDate,
+          items: [...orderItems, ...expenseItems],
+          actorId: employee.id,
+        });
       }
       router.replace('/purchase-orders');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // เพิ่มค่าใช้จ่ายอื่นๆ ที่ไม่ใช่วัตถุดิบในสต็อก — ผูกกับผู้ขายที่กำลังเลือกอยู่ (ทริปเดียวกัน)
+  function handleAddExpense() {
+    setExpenseError('');
+    if (!currentSupplierId) return;
+    const name = newExpenseName.trim();
+    const price = Number(newExpensePrice);
+    if (!name) {
+      setExpenseError('กรอกชื่อรายการ');
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      setExpenseError('กรอกราคาให้ถูกต้อง');
+      return;
+    }
+    setCustomItems((prev) => [
+      ...prev,
+      { id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, supplierId: currentSupplierId, name, unitPrice: newExpensePrice },
+    ]);
+    setNewExpenseName('');
+    setNewExpensePrice('');
+    setShowAddExpense(false);
+  }
+
+  function handleRemoveExpense(id: string) {
+    setCustomItems((prev) => prev.filter((c) => c.id !== id));
   }
 
   // เพิ่มวัตถุดิบใหม่เข้าคลังกลาง — ทุกตำแหน่งเพิ่มได้ (เจ้าของ/ผู้จัดการกำหนดผู้ขายภายหลัง)
@@ -411,36 +481,108 @@ export default function OrderPage() {
                 </div>
               )}
             </div>
+          <div className="rounded-2xl bg-white p-4 shadow-card">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-gray-700">ค่าใช้จ่ายอื่นๆ</p>
+              <button
+                type="button"
+                onClick={() => setShowAddExpense((v) => !v)}
+                className="text-xs font-semibold text-brand-600"
+              >
+                {showAddExpense ? 'ยกเลิก' : '+ เพิ่มรายการ'}
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400">
+              รายการที่ไม่ใช่วัตถุดิบในสต็อก เช่น ค่าเดินทาง ค่าน้ำแข็ง ค่าถุง — กรอกชื่อและราคาเอง
+            </p>
+
+            {showAddExpense && (
+              <div className="mt-3 space-y-2">
+                <input
+                  value={newExpenseName}
+                  onChange={(e) => setNewExpenseName(e.target.value)}
+                  placeholder="ชื่อรายการ เช่น ค่าเดินทาง"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand-400"
+                />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={newExpensePrice}
+                  onChange={(e) => setNewExpensePrice(e.target.value)}
+                  placeholder="ราคา (บาท)"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand-400"
+                />
+                {expenseError && <p className="text-[11px] text-status-warn">{expenseError}</p>}
+                <button
+                  type="button"
+                  onClick={handleAddExpense}
+                  className="w-full rounded-lg bg-brand-600 py-2 text-xs font-bold text-white"
+                >
+                  เพิ่มรายการ
+                </button>
+              </div>
+            )}
+
+            {customItemsForSupplier.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {customItemsForSupplier.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded-xl bg-gray-50 p-2.5">
+                    <p className="text-xs font-semibold text-gray-700">{c.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-gray-700">{customItemAmount(c).toLocaleString()} บาท</p>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExpense(c.id)}
+                        className="text-[11px] font-semibold text-status-warn"
+                      >
+                        ลบ
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           </>
         )}
 
-        {selectedItems.length > 0 && (
-          <div className="rounded-2xl bg-white p-4 shadow-card">
-            <p className="mb-2 text-xs font-bold text-gray-700">สรุป — จะสร้าง/รวมเป็นใบสั่งซื้อ {groupList.length} ใบ</p>
-            <div className="space-y-2">
-              {groupList.map(([supplierId, items]) => {
-                const supplier = suppliers.find((s) => s.id === supplierId);
-                return (
-                  <div key={supplierId} className="rounded-xl bg-gray-50 p-2.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-gray-800">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
-                      <p className="text-xs font-bold text-gray-700">{groupTotal(items).toLocaleString()} บาท</p>
-                    </div>
+        {(selectedItems.length > 0 || customItems.length > 0) && (
+        <div className="rounded-2xl bg-white p-4 shadow-card">
+          <p className="mb-2 text-xs font-bold text-gray-700">สรุป — จะสร้าง/รวมเป็นใบสั่งซื้อ {orderSupplierIds.length} ใบ</p>
+          <div className="space-y-2">
+            {orderSupplierIds.map((supplierId) => {
+              const supplier = suppliers.find((s) => s.id === supplierId);
+              const items = groupList.find(([id]) => id === supplierId)?.[1] ?? [];
+              const expenses = customItems.filter((c) => c.supplierId === supplierId);
+              const total = groupTotal(items) + customTotalForSupplier(supplierId);
+              return (
+                <div key={supplierId} className="rounded-xl bg-gray-50 p-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-800">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
+                    <p className="text-xs font-bold text-gray-700">{total.toLocaleString()} บาท</p>
+                  </div>
+                  {items.length > 0 && (
                     <p className="mt-0.5 text-[11px] text-gray-400">
                       {items.length} รายการ — {items.map((it) => `${it.name} ${qty[it.id] || 0} ${it.unit}`).join(', ')}
                     </p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2">
-              <p className="text-xs font-semibold text-gray-500">รวมทั้งหมด</p>
-              <p className="text-sm font-extrabold text-gray-900">{grandTotal.toLocaleString()} บาท</p>
-            </div>
+                  )}
+                  {expenses.length > 0 && (
+                    <p className="mt-0.5 text-[11px] text-gray-400">
+                      ค่าใช้จ่ายอื่นๆ {expenses.length} รายการ — {expenses.map((c) => `${c.name} ${customItemAmount(c).toLocaleString()} บาท`).join(', ')}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
+          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2">
+            <p className="text-xs font-semibold text-gray-500">รวมทั้งหมด</p>
+            <p className="text-sm font-extrabold text-gray-900">{(grandTotal + customExpenseGrandTotal).toLocaleString()} บาท</p>
+          </div>
+        </div>
+      )}
 
-        <PrimaryButton onClick={handleSubmit} disabled={!valid || submitting}>
+      <PrimaryButton onClick={handleSubmit} disabled={!valid || submitting}>
           {`บันทึกการสั่งซื้อ (${selectedItems.length} รายการ)`}
         </PrimaryButton>
       </main>

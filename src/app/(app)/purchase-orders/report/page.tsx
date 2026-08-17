@@ -55,7 +55,7 @@ export default function PurchaseReportPage() {
           const stockItem = it.stockItemId ? stockItems.find((s) => s.id === it.stockItemId) : undefined;
           const category = stockItem ? stockCategories.find((c) => c.id === stockItem.categoryId) : undefined;
           key = category?.id ?? 'uncategorized';
-          label = category?.name ?? 'ไม่ระบุหมวดหมู่';
+          label = category?.name ?? 'ค่าใช้จ่ายอื่นๆ';
         } else {
           key = it.stockItemId ?? `name:${it.itemName}`;
           label = it.itemName;

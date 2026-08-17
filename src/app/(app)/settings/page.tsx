@@ -491,19 +491,21 @@ export default function SettingsPage() {
         {employee && (
           <section className="rounded-2xl bg-white p-4 shadow-card">
             <SectionTitle>จัดซื้อ/การเงิน</SectionTitle>
-            <div className="grid grid-cols-2 gap-2">
+            <div className={isOwner ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
               <Link
                 href="/purchase-orders"
                 className="rounded-xl bg-gray-50 px-3 py-2.5 text-center text-xs font-semibold text-gray-700 active:bg-gray-100"
               >
                 📦 ใบสั่งซื้อ
               </Link>
-              <Link
-                href="/cash-report"
-                className="rounded-xl bg-gray-50 px-3 py-2.5 text-center text-xs font-semibold text-gray-700 active:bg-gray-100"
-              >
-                💵 รายงานเงินสด
-              </Link>
+              {isOwner && (
+                <Link
+                  href="/cash-report"
+                  className="rounded-xl bg-gray-50 px-3 py-2.5 text-center text-xs font-semibold text-gray-700 active:bg-gray-100"
+                >
+                  💵 รายงานเงินสด
+                </Link>
+              )}
             </div>
           </section>
         )}

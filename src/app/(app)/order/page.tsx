@@ -34,6 +34,13 @@ export default function OrderPage() {
   const [query, setQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategoryId, setNewItemCategoryId] = useState('');
+  const [newItemUnit, setNewItemUnit] = useState('');
+  const [addingItem, setAddingItem] = useState(false);
+  const [addItemError, setAddItemError] = useState('');
+
   // ซ่อนรายการที่เจ้าของ/ผู้จัดการยังไม่ได้กำหนดผู้ขายไว้ — พนักงานสั่งซื้อรายการเหล่านี้ไม่ได้
   const orderableItems = useMemo(() => stockItems.filter((it) => !!it.supplierId), [stockItems]);
   const unassignedCount = stockItems.length - orderableItems.length;
@@ -157,6 +164,39 @@ export default function OrderPage() {
     }
   }
 
+  // เพิ่มวัตถุดิบใหม่เข้าคลังกลาง — ทุกตำแหน่งเพิ่มได้ (เจ้าของ/ผู้จัดการกำหนดผู้ขายภายหลัง)
+  async function handleAddStockItem() {
+    if (!employee) return;
+    const name = newItemName.trim();
+    const unit = newItemUnit.trim();
+    if (!name || !newItemCategoryId || !unit) {
+      setAddItemError('กรอกชื่อวัตถุดิบ หมวดหมู่ และหน่วยให้ครบ');
+      return;
+    }
+    setAddItemError('');
+    setAddingItem(true);
+    try {
+      await store.createStockItem({
+        name,
+        categoryId: newItemCategoryId,
+        unit,
+        minQuantity: 0,
+        parQuantity: 0,
+        quantity: 0,
+        supplierId: null,
+        actorId: employee.id,
+      });
+      setNewItemName('');
+      setNewItemCategoryId('');
+      setNewItemUnit('');
+      setShowAddItem(false);
+    } catch (err) {
+      setAddItemError(err instanceof Error ? err.message : 'เพิ่มวัตถุดิบไม่สำเร็จ');
+    } finally {
+      setAddingItem(false);
+    }
+  }
+
   return (
     <div>
       <Header title="สั่งสินค้า" subtitle="เลือกผู้ขายก่อน แล้วติ๊กเลือกรายการที่จะสั่ง" currentEmployee={employee} />
@@ -169,6 +209,52 @@ export default function OrderPage() {
             onChange={(e) => setOrderDate(e.target.value)}
             className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-brand-400"
           />
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 shadow-card">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-xs font-bold text-gray-700">เพิ่มวัตถุดิบใหม่เข้าคลัง</p>
+            <button onClick={() => setShowAddItem((v) => !v)} className="text-[11px] font-semibold text-brand-600">
+              {showAddItem ? 'ยกเลิก' : '+ เพิ่มวัตถุดิบ'}
+            </button>
+          </div>
+          {showAddItem && (
+            <div className="space-y-2">
+              <input
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder="ชื่อวัตถุดิบ เช่น นมสด UHT"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand-400"
+              />
+              <div className="flex gap-2">
+                <select
+                  value={newItemCategoryId}
+                  onChange={(e) => setNewItemCategoryId(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand-400"
+                >
+                  <option value="">เลือกหมวดหมู่</option>
+                  {stockCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <input
+                  value={newItemUnit}
+                  onChange={(e) => setNewItemUnit(e.target.value)}
+                  placeholder="หน่วย เช่น ขวด, กก."
+                  className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand-400"
+                />
+              </div>
+              {addItemError && <p className="text-[11px] text-status-warn">{addItemError}</p>}
+              <button
+                onClick={handleAddStockItem}
+                disabled={addingItem}
+                className="w-full rounded-lg bg-brand-600 py-2 text-xs font-bold text-white disabled:opacity-40"
+              >
+                {addingItem ? 'กำลังบันทึก...' : 'บันทึกวัตถุดิบใหม่'}
+              </button>
+              <p className="text-[11px] text-gray-400">วัตถุดิบใหม่จะเข้าคลังกลาง เจ้าของ/ผู้จัดการเป็นผู้กำหนดผู้ขายภายหลังที่หน้า &quot;ตั้งค่าระบบ&quot;</p>
+            </div>
+          )}
         </div>
 
         {unassignedCount > 0 && (

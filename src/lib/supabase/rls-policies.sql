@@ -72,9 +72,10 @@ create policy "stock_items_update_any_staff"
   using (public.current_employee_role() in ('owner', 'manager', 'staff'))
   with check (public.current_employee_role() in ('owner', 'manager', 'staff'));
 
-create policy "stock_items_insert_owner_manager"
+create policy "stock_items_insert_all_roles"
   on public.stock_items for insert
-  with check (public.current_employee_role() in ('owner', 'manager'));
+  -- ทุกตำแหน่งเพิ่มวัตถุดิบใหม่เข้าคลังกลางได้ (owner/manager/staff)
+  with check (public.current_employee_role() in ('owner', 'manager', 'staff'));
 
 create policy "stock_items_delete_owner_only"
   on public.stock_items for delete
@@ -225,13 +226,14 @@ create policy "purchase_order_items_delete_owner_manager"
   using (public.current_employee_role() in ('owner', 'manager'));
 
 -- ---------------- CASH REPORTS (รายงานเงินสดปิดร้าน — เห็น/บันทึกได้เฉพาะ owner/manager, append-only) ----------------
-create policy "cash_reports_select_owner_manager"
+create policy "cash_reports_select_owner"
   on public.cash_reports for select
-  using (public.current_employee_role() in ('owner', 'manager'));
+  -- สรุปการเงิน/รายงานเงินสด: เจ้าของร้านเท่านั้น (ผู้จัดการทำได้ทุกอย่างยกเว้นส่วนนี้)
+  using (public.current_employee_role() = 'owner');
 
-create policy "cash_reports_insert_owner_manager"
+create policy "cash_reports_insert_owner"
   on public.cash_reports for insert
-  with check (public.current_employee_role() in ('owner', 'manager'));
+  with check (public.current_employee_role() = 'owner');
 -- ไม่มี policy UPDATE/DELETE — รายงานเงินสดเป็นประวัติ ห้ามแก้ไข/ลบ ต้องบันทึกใหม่เท่านั้น
 
 -- ---------------- STORE HOLIDAYS (วันหยุดร้าน) ----------------
@@ -307,9 +309,10 @@ create policy "order_reminders_select_all"
   on public.order_reminders for select
   using (auth.role() = 'authenticated');
 
-create policy "order_reminders_insert_owner_manager"
+create policy "order_reminders_insert_all_roles"
   on public.order_reminders for insert
-  with check (public.current_employee_role() in ('owner', 'manager'));
+  -- ทุกตำแหน่งส่งแจ้งเตือนให้แผนกไหนก็ได้ (owner/manager/staff)
+  with check (public.current_employee_role() in ('owner', 'manager', 'staff'));
 
 create policy "order_reminders_update_station_or_manager"
   on public.order_reminders for update

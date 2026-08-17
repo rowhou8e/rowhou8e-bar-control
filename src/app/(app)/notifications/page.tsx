@@ -86,7 +86,7 @@ export default function NotificationsPage() {
         currentEmployee={employee}
       />
       <main className="space-y-4 px-4 py-4">
-        {canManage && employee && <SendReminderSection stations={stations} employeeId={employee.id} />}
+        {employee && <SendReminderSection stations={stations} employeeId={employee.id} />}
 
         {scopedReminders.length > 0 && (
           <section className="space-y-2.5">
@@ -167,7 +167,7 @@ export default function NotificationsPage() {
 }
 
 // ============================================================================
-// ส่งแจ้งเตือนให้แผนกสั่งสินค้า — เจ้าของ/ผู้จัดการเท่านั้น — เฟส 5
+// ส่งแจ้งเตือนให้แผนกสั่งสินค้า — ทุกตำแหน่งส่งได้ (เลือกแผนกไหนก็ได้) — เฟส 5
 // ============================================================================
 const ALL_STATIONS_VALUE = '__all__';
 

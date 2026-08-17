@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { store } from '@/lib/store';
@@ -40,6 +40,13 @@ export default function OrderPage() {
   const [newItemUnit, setNewItemUnit] = useState('');
   const [addingItem, setAddingItem] = useState(false);
   const [addItemError, setAddItemError] = useState('');
+  const [showImportItems, setShowImportItems] = useState(false);
+  const [importRows, setImportRows] = useState<
+    Array<{ name: string; categoryName: string; unit: string; categoryId: string | null; error: string | null }>
+  >([]);
+  const [importError, setImportError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState('');
 
   // ค่าใช้จ่ายอื่นๆ — รายการที่ไม่ใช่วัตถุดิบในสต็อก พนักงานกรอกชื่อ+ราคาเอง (เช่น ค่าเดินทาง ค่าน้ำแข็ง ค่าถุง)
   const [customItems, setCustomItems] = useState<Array<{ id: string; supplierId: string; name: string; unitPrice: string }>>([]);
@@ -235,6 +242,141 @@ export default function OrderPage() {
   }
 
   // เพิ่มวัตถุดิบใหม่เข้าคลังกลาง — ทุกตำแหน่งเพิ่มได้ (เจ้าของ/ผู้จัดการกำหนดผู้ขายภายหลัง)
+  function parseImportCsv(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(field);
+        field = '';
+      } else if (ch === '\n') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+      } else if (ch === '\r') {
+        // skip
+      } else {
+        field += ch;
+      }
+    }
+    if (field.length > 0 || row.length > 0) {
+      row.push(field);
+      rows.push(row);
+    }
+    return rows.filter((r) => r.some((c) => c.trim() !== ''));
+  }
+
+  // ดาวน์โหลดเทมเพลตไฟล์ CSV สำหรับนำเข้าวัตถุดิบใหม่ทีละหลายรายการ
+  function handleDownloadImportTemplate() {
+    const exampleCategory = stockCategories[0]?.name ?? 'ผัก(ไทย)';
+    const lines = ['ชื่อวัตถุดิบ,หมวดหมู่,หน่วยนับ', `นมสด UHT,${exampleCategory},กล่อง`];
+    const csv = '\uFEFF' + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'เทมเพลตนำเข้าวัตถุดิบ.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImportError('');
+    setImportResult('');
+    setImportRows([]);
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setImportError('รองรับเฉพาะไฟล์ .csv — เปิดไฟล์ Excel แล้วเลือก "บันทึกเป็น" หรือ "Save As" แล้วเลือกชนิดไฟล์ CSV ก่อนอัปโหลด');
+      return;
+    }
+    file.text().then((text) => {
+      const table = parseImportCsv(text);
+      if (table.length < 2) {
+        setImportError('ไม่พบข้อมูลในไฟล์ หรือไฟล์มีแค่แถวหัวตาราง');
+        return;
+      }
+      const header = table[0].map((h) => h.trim());
+      const nameIdx = header.findIndex((h) => h.includes('ชื่อ'));
+      const categoryIdx = header.findIndex((h) => h.includes('หมวด'));
+      const unitIdx = header.findIndex((h) => h.includes('หน่วย'));
+      if (nameIdx === -1 || categoryIdx === -1 || unitIdx === -1) {
+        setImportError('ไม่พบคอลัมน์ ชื่อวัตถุดิบ / หมวดหมู่ / หน่วยนับ — กรุณาดาวน์โหลดเทมเพลตแล้วกรอกตามหัวตาราง');
+        return;
+      }
+      const rows = table.slice(1).map((cols) => {
+        const name = (cols[nameIdx] || '').trim();
+        const categoryName = (cols[categoryIdx] || '').trim();
+        const unit = (cols[unitIdx] || '').trim();
+        let error: string | null = null;
+        let categoryId: string | null = null;
+        if (!name) {
+          error = 'ไม่มีชื่อวัตถุดิบ';
+        } else if (!categoryName) {
+          error = 'ไม่ระบุหมวดหมู่';
+        } else {
+          const cat = stockCategories.find((c) => c.name.trim().toLowerCase() === categoryName.toLowerCase());
+          if (!cat) {
+            error = `ไม่พบหมวดหมู่ "${categoryName}"`;
+          } else {
+            categoryId = cat.id;
+          }
+        }
+        if (!error && !unit) error = 'ไม่ระบุหน่วยนับ';
+        return { name, categoryName, unit, categoryId, error };
+      });
+      setImportRows(rows);
+    });
+  }
+
+  async function handleImportConfirm() {
+    if (!employee) return;
+    const valid = importRows.filter((r) => !r.error && r.categoryId);
+    if (valid.length === 0) return;
+    setImporting(true);
+    let successCount = 0;
+    let failCount = 0;
+    for (const row of valid) {
+      try {
+        await store.createStockItem({
+          name: row.name,
+          categoryId: row.categoryId as string,
+          unit: row.unit,
+          minQuantity: 0,
+          parQuantity: 0,
+          quantity: 0,
+          supplierId: null,
+          actorId: employee.id,
+        });
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+    setImporting(false);
+    setImportRows([]);
+    setShowImportItems(false);
+    setImportResult(`นำเข้าสำเร็จ ${successCount} รายการ${failCount > 0 ? ` (ล้มเหลว ${failCount} รายการ)` : ''}`);
+  }
+
   async function handleAddStockItem() {
     if (!employee) return;
     const name = newItemName.trim();
@@ -283,12 +425,32 @@ export default function OrderPage() {
 
         <div className="rounded-2xl bg-white p-4 shadow-card">
           <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-xs font-bold text-gray-700">เพิ่มวัตถุดิบใหม่เข้าคลัง</p>
-            <button onClick={() => setShowAddItem((v) => !v)} className="text-[11px] font-semibold text-brand-600">
-              {showAddItem ? 'ยกเลิก' : '+ เพิ่มวัตถุดิบ'}
-            </button>
-          </div>
-          {showAddItem && (
+              <p className="text-xs font-bold text-gray-700">เพิ่มวัตถุดิบใหม่เข้าคลัง</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setShowImportItems((v) => !v);
+                    setShowAddItem(false);
+                    setImportRows([]);
+                    setImportError('');
+                    setImportResult('');
+                  }}
+                  className="text-[11px] font-semibold text-brand-600"
+                >
+                  {showImportItems ? 'ยกเลิก' : 'นำเข้าจาก Excel'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddItem((v) => !v);
+                    setShowImportItems(false);
+                  }}
+                  className="text-[11px] font-semibold text-brand-600"
+                >
+                  {showAddItem ? 'ยกเลิก' : '+ เพิ่มวัตถุดิบ'}
+                </button>
+              </div>
+            </div>
+            {showAddItem && (
             <div className="space-y-2">
               <input
                 value={newItemName}
@@ -322,7 +484,62 @@ export default function OrderPage() {
               >
                 {addingItem ? 'กำลังบันทึก...' : 'บันทึกวัตถุดิบใหม่'}
               </button>
-              <p className="text-[11px] text-gray-400">วัตถุดิบใหม่จะเข้าคลังกลาง เจ้าของ/ผู้จัดการเป็นผู้กำหนดผู้ขายภายหลังที่หน้า &quot;ตั้งค่าระบบ&quot;</p>
+              {showImportItems && (
+              <div className="mt-2 space-y-2 rounded-xl bg-gray-50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-gray-500">
+                    อัปโหลดไฟล์ CSV ที่มีคอลัมน์ ชื่อวัตถุดิบ, หมวดหมู่, หน่วยนับ (บันทึกจาก Excel เป็น .csv ก่อนอัปโหลด)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDownloadImportTemplate}
+                    className="shrink-0 text-[11px] font-semibold text-brand-600"
+                  >
+                    ดาวน์โหลดเทมเพลต
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400">หมวดหมู่ที่มีอยู่: {stockCategories.map((c) => c.name).join(', ')}</p>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportFileChange}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-brand-400"
+                />
+                {importError && <p className="text-[11px] text-status-warn">{importError}</p>}
+                {importResult && <p className="text-[11px] font-semibold text-emerald-600">{importResult}</p>}
+                {importRows.length > 0 && (
+                  <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2">
+                    {importRows.map((row, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2 border-b border-gray-100 py-1 last:border-0">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-gray-700">{row.name || `แถวที่ ${idx + 2}`}</p>
+                          <p className="truncate text-[11px] text-gray-400">{row.categoryName} · {row.unit}</p>
+                        </div>
+                        {row.error ? (
+                          <span className="shrink-0 text-[11px] font-semibold text-status-warn">{row.error}</span>
+                        ) : (
+                          <span className="shrink-0 text-[11px] font-semibold text-emerald-600">พร้อมนำเข้า</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {importRows.length > 0 && (
+                  <p className="text-[11px] text-gray-500">
+                    พร้อมนำเข้า {importRows.filter((r) => !r.error).length} จาก {importRows.length} รายการ
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleImportConfirm}
+                  disabled={importing || importRows.filter((r) => !r.error).length === 0}
+                  className="w-full rounded-lg bg-brand-600 py-2 text-xs font-bold text-white disabled:opacity-40"
+                >
+                  {importing ? 'กำลังนำเข้า...' : `นำเข้า ${importRows.filter((r) => !r.error).length} รายการ`}
+                </button>
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400">วัตถุดิบใหม่จะเข้าคลังกลาง เจ้าของ/ผู้จัดการเป็นผู้กำหนดผู้ขายภายหลังที่หน้า &quot;ตั้งค่าระบบ&quot;</p>
             </div>
           )}
         </div>

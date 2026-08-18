@@ -83,20 +83,19 @@ async function renderPurchaseOrderImageBlob(
   const hasContactLine = Boolean(supplier?.contactPerson || supplier?.phone);
   const supplierH = 20 + (hasContactLine ? 24 : 0) + (supplier?.address ? 22 : 0);
   const tableY = supplierY + supplierH + 20;
-  const tableHeaderH = 38;
+  const tableHeaderH = 40;
 
   const col = {
     nameX: marginX,
-    nameW: 330,
-    qtyRight: marginX + 460,
-    priceRight: marginX + 610,
+    nameW: 430,
+    qtyRight: marginX + 560,
     subtotalRight: W - marginX,
   };
 
-  mctx.font = `600 15px ${FONT_FAMILY}`;
+  mctx.font = `600 16px ${FONT_FAMILY}`;
   const itemRows = po.items.map((it) => {
     const lines = wrapText(mctx, it.itemName, col.nameW);
-    const rowH = Math.max(42, lines.length * 21 + 18);
+    const rowH = Math.max(46, lines.length * 23 + 18);
     return { it, lines, rowH };
   });
   const itemsTotalH = itemRows.reduce((sum, r) => sum + r.rowH, 0);
@@ -171,13 +170,12 @@ async function renderPurchaseOrderImageBlob(
   ctx.fillStyle = HEADER_BG;
   ctx.fillRect(marginX, tableY, contentW, tableHeaderH);
   ctx.fillStyle = BRAND_DARK;
-  ctx.font = `700 14px ${FONT_FAMILY}`;
+  ctx.font = `700 15px ${FONT_FAMILY}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.fillText('รายการสินค้า', col.nameX + 10, tableY + tableHeaderH / 2);
+  ctx.fillText(`รายการสินค้า (${po.items.length} รายการ)`, col.nameX + 10, tableY + tableHeaderH / 2);
   ctx.textAlign = 'right';
   ctx.fillText('จำนวน', col.qtyRight, tableY + tableHeaderH / 2);
-  ctx.fillText('ราคา/หน่วย', col.priceRight, tableY + tableHeaderH / 2);
   ctx.fillText('รวม (บาท)', col.subtotalRight - 10, tableY + tableHeaderH / 2);
   ctx.textAlign = 'left';
 
@@ -193,7 +191,7 @@ async function renderPurchaseOrderImageBlob(
     const startY = centerY - ((lines.length - 1) * lineH) / 2;
 
     ctx.fillStyle = TEXT_DARK;
-    ctx.font = `600 15px ${FONT_FAMILY}`;
+    ctx.font = `600 16px ${FONT_FAMILY}`;
     ctx.textAlign = 'left';
     lines.forEach((line, i) => {
       ctx.fillText(line, col.nameX + 10, startY + i * lineH);
@@ -201,11 +199,10 @@ async function renderPurchaseOrderImageBlob(
 
     ctx.textAlign = 'right';
     ctx.fillStyle = TEXT_GRAY;
-    ctx.font = `400 14px ${FONT_FAMILY}`;
+    ctx.font = `400 15px ${FONT_FAMILY}`;
     ctx.fillText(`${it.quantity.toLocaleString()} ${it.unit}`, col.qtyRight, centerY);
-    ctx.fillText(it.unitPrice.toLocaleString(), col.priceRight, centerY);
     ctx.fillStyle = TEXT_DARK;
-    ctx.font = `700 15px ${FONT_FAMILY}`;
+    ctx.font = `700 16px ${FONT_FAMILY}`;
     ctx.fillText((it.quantity * it.unitPrice).toLocaleString(), col.subtotalRight - 10, centerY);
     ctx.textAlign = 'left';
 

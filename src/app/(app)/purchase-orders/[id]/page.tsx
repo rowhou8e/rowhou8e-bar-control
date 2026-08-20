@@ -43,6 +43,7 @@ export default function PurchaseOrderDetailPage() {
   const total = po.items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
   const next = NEXT_STATUS[po.status];
   const canCancel = po.status === 'draft' || po.status === 'sent' || po.status === 'confirmed';
+  const canEditPrice = po.status !== 'cancelled';
 
   function handleAdvance() {
     if (!employee || !next) return;
@@ -55,13 +56,15 @@ export default function PurchaseOrderDetailPage() {
     store.updatePurchaseOrderStatus(po!.id, 'cancelled', employee.id);
   }
 
-  function handlePriceCommit(itemId: string, rawValue: string) {
+  function handleTotalPriceCommit(itemId: string, quantity: number, rawValue: string) {
     if (!employee) return;
-    const price = Number(rawValue);
-    if (!Number.isFinite(price) || price < 0) return;
-    const original = po!.items.find((it) => it.id === itemId)?.unitPrice;
-    if (original === price) return;
-    store.updatePurchaseOrderItemPrice(po!.id, itemId, price, employee.id);
+    const totalPrice = Number(rawValue);
+    if (!Number.isFinite(totalPrice) || totalPrice < 0) return;
+    const item = po!.items.find((it) => it.id === itemId);
+    if (!item) return;
+    const unitPrice = quantity > 0 ? totalPrice / quantity : totalPrice;
+    if (item.unitPrice === unitPrice) return;
+    store.updatePurchaseOrderItemPrice(po!.id, itemId, unitPrice, employee.id);
   }
 
   async function handleDownloadImage() {
@@ -129,39 +132,38 @@ export default function PurchaseOrderDetailPage() {
 
         <div className="rounded-2xl bg-white p-4 shadow-card">
           <p className="mb-2 text-xs font-bold text-gray-700">รายการสินค้า ({po.items.length} รายการ)</p>
-          {po.status === 'draft' && (
-            <p className="-mt-1 mb-2 text-[11px] text-gray-400">แตะที่ราคาเพื่อแก้ไขให้ตรงกับราคาที่ซื้อจริง ก่อนส่งให้ผู้ขาย</p>
-          )}
+      {canEditPrice && (
+        <p className="-mt-1 mb-2 text-[11px] text-gray-400">
+          แตะยอดรวมเพื่อแก้ไขราคาให้ตรงกับที่ซื้อจริง เช่น กรณีสินค้ามาเกินจำนวนที่สั่ง
+        </p>
+      )}
           <div className="space-y-2">
-            {po.items.map((it) => (
-              <div key={it.id} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs last:border-0 last:pb-0">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-gray-800">{it.itemName}</p>
-                  {po.status === 'draft' ? (
-                    <div className="mt-1 flex items-center gap-1 text-gray-400">
-                      <span>
-                        {it.quantity} {it.unit} ×
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        step="0.01"
-                        defaultValue={it.unitPrice}
-                        onBlur={(e) => handlePriceCommit(it.id, e.target.value)}
-                        className="w-20 rounded-lg border border-gray-200 px-1.5 py-0.5 text-right text-xs text-gray-700"
-                      />
-                      <span>บาท</span>
-                    </div>
-                  ) : (
-                    <p className="text-gray-400">
-                      {it.quantity} {it.unit} × {it.unitPrice.toLocaleString()} บาท
-                    </p>
-                  )}
-                </div>
-                <p className="shrink-0 font-bold text-gray-700">{(it.quantity * it.unitPrice).toLocaleString()} บาท</p>
+        {po.items.map((it) => (
+          <div key={it.id} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs last:border-0 last:pb-0">
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-gray-800">{it.itemName}</p>
+              <p className="mt-1 text-gray-400">
+                {it.quantity} {it.unit}
+              </p>
+            </div>
+            {canEditPrice ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  defaultValue={it.quantity * it.unitPrice}
+                  onBlur={(e) => handleTotalPriceCommit(it.id, it.quantity, e.target.value)}
+                  className="w-24 rounded-lg border border-gray-200 px-1.5 py-0.5 text-right text-xs font-bold text-gray-700"
+                />
+                <span className="text-gray-500">บาท</span>
               </div>
-            ))}
+            ) : (
+              <p className="shrink-0 font-bold text-gray-700">{(it.quantity * it.unitPrice).toLocaleString()} บาท</p>
+            )}
+          </div>
+        ))}
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2">
             <p className="text-xs font-semibold text-gray-500">รวมทั้งหมด</p>

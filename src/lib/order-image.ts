@@ -7,15 +7,15 @@ import { formatThaiDate, formatThaiDateTime, getEmployeeName } from './derive';
  * วาดด้วย Canvas 2D ล้วน ๆ ไม่พึ่ง library ภายนอก (เลี่ยงปัญหาติดตั้ง dependency)
  */
 
-const BRAND = '#EA580C';
-const BRAND_DARK = '#C2410C';
-const TEXT_DARK = '#111827';
-const TEXT_GRAY = '#6B7280';
-const TEXT_LIGHT_GRAY = '#9CA3AF';
-const BORDER = '#E5E7EB';
-const ROW_ALT = '#FFF7ED';
-const HEADER_BG = '#FFF1E6';
-const TOTAL_BG = '#FFF7ED';
+const BRAND = '#141414';
+const BRAND_DARK = '#000000';
+const TEXT_DARK = '#0A0A0A';
+const TEXT_GRAY = '#454545';
+const TEXT_LIGHT_GRAY = '#6E6E6E';
+const BORDER = '#CFCFCF';
+const ROW_ALT = '#F5F5F5';
+const HEADER_BG = '#EBEBEB';
+const TOTAL_BG = '#E0E0E0';
 
 const FONT_FAMILY = "'Noto Sans Thai', system-ui, sans-serif";
 

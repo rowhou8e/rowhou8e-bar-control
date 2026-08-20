@@ -224,7 +224,7 @@ create policy "purchase_order_items_update_any_staff_draft"
     and exists (
       select 1 from public.purchase_orders po
       where po.id = purchase_order_items.purchase_order_id
-        and po.status = 'draft'
+        and po.status <> 'cancelled'
     )
   )
   with check (
@@ -232,7 +232,7 @@ create policy "purchase_order_items_update_any_staff_draft"
     and exists (
       select 1 from public.purchase_orders po
       where po.id = purchase_order_items.purchase_order_id
-        and po.status = 'draft'
+        and po.status <> 'cancelled'
     )
   );
 

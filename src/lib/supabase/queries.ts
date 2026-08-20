@@ -1161,7 +1161,9 @@ export async function updatePurchaseOrderItemPrice(purchaseOrderId: string, item
     .eq('id', purchaseOrderId)
     .single();
   if (orderError) throw orderError;
-  if (!order || order.status !== 'draft') throw new Error('แก้ไขราคาได้เฉพาะใบสั่งซื้อสถานะร่างเท่านั้น');
+    if (!order) throw new Error('ไม่พบใบสั่งซื้อนี้');
+    if (order.status === 'cancelled')
+      throw new Error('ไม่สามารถแก้ไขราคาใบสั่งซื้อที่ถูกยกเลิกได้');
 
   const { data: item, error: itemError } = await sb
     .from('purchase_order_items')

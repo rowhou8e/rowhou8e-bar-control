@@ -441,6 +441,7 @@ export class LiveStore {
     nickname: string;
     role: Role;
     stationId: string | null;
+    stationIds: string[];
     pinCode: string;
     email: string;
     password: string;
@@ -452,7 +453,7 @@ export class LiveStore {
 
   async updateEmployee(
     id: string,
-    patch: { role?: Role; active?: boolean; stationId?: string | null; name?: string; nickname?: string },
+    patch: { role?: Role; active?: boolean; stationId?: string | null; stationIds?: string[]; name?: string; nickname?: string },
     actorId: string
   ) {
     await q.updateEmployee(id, patch, actorId);

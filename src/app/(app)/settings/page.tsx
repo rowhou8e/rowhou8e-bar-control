@@ -43,6 +43,7 @@ export default function SettingsPage() {
   const [newEmpNickname, setNewEmpNickname] = useState('');
   const [newEmpRole, setNewEmpRole] = useState<Role>('staff');
   const [newEmpStationId, setNewEmpStationId] = useState('');
+  const [newEmpStationIds, setNewEmpStationIds] = useState<string[]>([]);
   const [newEmpPin, setNewEmpPin] = useState('');
   const [newEmpEmail, setNewEmpEmail] = useState('');
   const [newEmpPassword, setNewEmpPassword] = useState('');
@@ -78,6 +79,7 @@ export default function SettingsPage() {
     setNewEmpNickname('');
     setNewEmpRole('staff');
     setNewEmpStationId('');
+    setNewEmpStationIds([]);
     setNewEmpPin('');
     setNewEmpEmail('');
     setNewEmpPassword('');
@@ -106,6 +108,7 @@ export default function SettingsPage() {
         nickname: newEmpNickname.trim(),
         role: newEmpRole,
         stationId: newEmpStationId || null,
+        stationIds: newEmpStationIds,
         pinCode: newEmpPin,
         email: newEmpEmail.trim(),
         password: newEmpPassword,
@@ -197,20 +200,27 @@ export default function SettingsPage() {
                       <option value="manager">{roleLabel('manager')}</option>
                       <option value="staff">{roleLabel('staff')}</option>
                     </select>
-                    <select
-                      value={newEmpStationId}
-                      onChange={(e) => setNewEmpStationId(e.target.value)}
-                      className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none"
-                    >
-                      <option value="">ไม่ระบุแผนก (ทำได้ทุกแผนก)</option>
-                      {stations
-                        .filter((s) => s.active)
-                        .map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                    </select>
+                    <div className="col-span-2 space-y-1 rounded-lg border border-gray-200 bg-white p-2.5">
+                      <p className="text-[11px] font-medium text-gray-500">แผนกที่เข้าถึงได้ (เลือกได้หลายแผนก)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {stations
+                          .filter((s) => s.active)
+                          .map((s) => (
+                            <label key={s.id} className="flex items-center gap-1 text-[11px]">
+                              <input
+                                type="checkbox"
+                                checked={newEmpStationIds.includes(s.id)}
+                                onChange={(e) =>
+                                  setNewEmpStationIds((prev) =>
+                                    e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id)
+                                  )
+                                }
+                              />
+                              {s.name}
+                            </label>
+                          ))}
+                      </div>
+                    </div>
                   </div>
 
                   {isMockMode ? (
@@ -335,24 +345,31 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     {emp.role === 'staff' && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-[11px] text-gray-500">แผนกที่ประจำ:</span>
-                        <select
-                          value={emp.stationId ?? ''}
-                          onChange={(e) =>
-                            employee && store.updateEmployee(emp.id, { stationId: e.target.value || null }, employee.id)
-                          }
-                          className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs outline-none"
-                        >
-                          <option value="">ไม่ระบุ (ทำได้ทุกแผนก)</option>
+                      <div className="mt-2 space-y-1">
+                        <span className="text-[11px] text-gray-500">แผนกที่เข้าถึงได้:</span>
+                        <div className="flex flex-wrap gap-2">
                           {stations
                             .filter((s) => s.active)
                             .map((s) => (
-                              <option key={s.id} value={s.id}>
+                              <label
+                                key={s.id}
+                                className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px]"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={emp.stationIds.includes(s.id)}
+                                  onChange={(e) => {
+                                    if (!employee) return;
+                                    const next = e.target.checked
+                                      ? [...emp.stationIds, s.id]
+                                      : emp.stationIds.filter((id) => id !== s.id);
+                                    store.updateEmployee(emp.id, { stationIds: next }, employee.id);
+                                  }}
+                                />
                                 {s.name}
-                              </option>
+                              </label>
                             ))}
-                        </select>
+                        </div>
                       </div>
                     )}
 

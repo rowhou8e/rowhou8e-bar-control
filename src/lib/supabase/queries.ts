@@ -115,6 +115,17 @@ export async function fetchEmployees(): Promise<Employee[]> {
   const sb = getSupabaseClient();
   const { data, error } = await sb.from('employees').select('*').eq('active', true).order('name');
   if (error) throw error;
+  const empIds = (data ?? []).map((r: any) => r.id);
+  const stationIdsMap = new Map<string, string[]>();
+  if (empIds.length > 0) {
+    const { data: esRows, error: esError } = await sb.from('employee_stations').select('employee_id, station_id').in('employee_id', empIds);
+    if (esError) throw esError;
+    for (const row of esRows ?? []) {
+      const arr = stationIdsMap.get(row.employee_id) ?? [];
+      arr.push(row.station_id);
+      stationIdsMap.set(row.employee_id, arr);
+    }
+  }
   return (data ?? []).map((r: any) => ({
     id: r.id,
     name: r.name,
@@ -123,6 +134,7 @@ export async function fetchEmployees(): Promise<Employee[]> {
     avatarColor: r.avatar_color,
     pinCode: '', // โหมด Supabase ใช้ Supabase Auth ล็อกอินจริง ไม่ใช้ PIN
     stationId: r.station_id,
+    stationIds: stationIdsMap.get(r.id) ?? [],
     active: r.active,
     createdAt: r.created_at,
     lastLoginAt: r.last_login_at ?? null,
@@ -136,6 +148,8 @@ export async function fetchEmployeeByAuthUserId(authUserId: string): Promise<Emp
   const { data, error } = await sb.from('employees').select('*').eq('auth_user_id', authUserId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
+  const { data: esRows, error: esError } = await sb.from('employee_stations').select('station_id').eq('employee_id', data.id);
+  if (esError) throw esError;
   return {
     id: data.id,
     name: data.name,
@@ -144,6 +158,7 @@ export async function fetchEmployeeByAuthUserId(authUserId: string): Promise<Emp
     avatarColor: data.avatar_color,
     pinCode: '',
     stationId: data.station_id,
+    stationIds: (esRows ?? []).map((row: any) => row.station_id),
     active: data.active,
     createdAt: data.created_at,
     lastLoginAt: data.last_login_at ?? null,
@@ -1472,6 +1487,7 @@ export async function createEmployee(input: {
   nickname: string;
   role: string;
   stationId: string | null;
+  stationIds: string[];
   email: string;
   password: string;
   actorId: string;
@@ -1489,6 +1505,7 @@ export async function createEmployee(input: {
       nickname: input.nickname,
       role: input.role,
       stationId: input.stationId,
+      stationIds: input.stationIds,
       email: input.email,
       password: input.password,
     }),
@@ -1539,7 +1556,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 // ================= EMPLOYEES (แก้ไข) =================
 export async function updateEmployee(
   id: string,
-  patch: { role?: string; active?: boolean; stationId?: string | null; name?: string; nickname?: string },
+  patch: { role?: string; active?: boolean; stationId?: string | null; stationIds?: string[]; name?: string; nickname?: string },
   actorId: string
 ) {
   const sb = getSupabaseClient();
@@ -1555,9 +1572,21 @@ export async function updateEmployee(
   const { error } = await sb.from('employees').update(dbPatch).eq('id', id);
   if (error) throw error;
 
+  if (patch.stationIds !== undefined) {
+    const { error: delError } = await sb.from('employee_stations').delete().eq('employee_id', id);
+    if (delError) throw delError;
+    if (patch.stationIds.length > 0) {
+      const { error: insError } = await sb
+        .from('employee_stations')
+        .insert(patch.stationIds.map((stationId) => ({ employee_id: id, station_id: stationId })));
+      if (insError) throw insError;
+    }
+  }
+
   let detail = 'แก้ไขข้อมูลพนักงาน';
   if (patch.role) detail = `เปลี่ยนสิทธิ์เป็น ${patch.role}`;
   else if (patch.active !== undefined) detail = patch.active ? 'เปิดใช้งานพนักงาน' : 'ระงับการใช้งานพนักงาน';
+  else if (patch.stationIds !== undefined) detail = `เปลี่ยนแผนกที่เข้าถึงได้ (${patch.stationIds.length} แผนก)`;
   else if (patch.stationId !== undefined) {
     const { data: station } = patch.stationId ? await sb.from('stations').select('name').eq('id', patch.stationId).single() : { data: null };
     detail = `เปลี่ยนแผนกที่ประจำเป็น ${station?.name ?? 'ไม่ระบุ'}`;

@@ -29,6 +29,7 @@ export interface Employee {
   avatarColor: string; // ใช้แสดงตัวอักษรย่อสีพื้นหลัง (ไม่มีระบบรูปโปรไฟล์ในเวอร์ชันนี้)
   pinCode: string; // PIN 4 หลักสำหรับยืนยันตัวตนแบบง่าย (prototype only — production ควรใช้ Supabase Auth)
   stationId: string | null; // แผนกที่ประจำ — null สำหรับ Owner/Manager หรือพนักงานที่ไม่ได้ผูกกับแผนกเดียว
+  stationIds: string[]; // แผนกที่เข้าถึงได้ (เลือกได้หลายแผนก) — ว่าง = ยังไม่ถูกกำหนดแผนก (staff จะไม่เห็นเช็คลิสต์จนกว่าจะกำหนด)
   active: boolean;
   createdAt: string;
   /** อุปกรณ์/เวลาล็อกอินล่าสุด — เก็บแค่ครั้งล่าสุดครั้งเดียวต่อพนักงาน (ไม่ใช่ประวัติ) — เฟส 4 */
@@ -464,6 +465,7 @@ export interface AppStore {
     nickname: string;
     role: Role;
     stationId: string | null;
+    stationIds: string[];
     pinCode: string;
     email: string;
     password: string;
@@ -473,7 +475,7 @@ export interface AppStore {
     id: string,
     /** pinCode ใช้ได้เฉพาะโหมด mock เท่านั้น (โหมด Supabase ใช้อีเมล/รหัสผ่านผ่าน Supabase Auth แทน — ค่านี้จะถูกละเว้น)
      *  name/nickname เปลี่ยนได้เฉพาะเจ้าของร้านเท่านั้น (จำกัดสิทธิ์ที่หน้าจอ + RLS ฝั่ง employees_update_owner_only) */
-    patch: { role?: Role; active?: boolean; stationId?: string | null; pinCode?: string; name?: string; nickname?: string },
+    patch: { role?: Role; active?: boolean; stationId?: string | null; stationIds?: string[]; pinCode?: string; name?: string; nickname?: string },
     actorId: string
   ): void | Promise<void>;
   /**

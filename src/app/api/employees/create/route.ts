@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
   const nickname = String(body?.nickname ?? '').trim();
   const role = String(body?.role ?? '');
   const stationId = body?.stationId ? String(body.stationId) : null;
+  const stationIds: string[] = Array.isArray(body?.stationIds)
+    ? body.stationIds.filter((s: unknown) => typeof s === 'string')
+    : [];
   const email = String(body?.email ?? '').trim();
   const password = String(body?.password ?? '');
 
@@ -105,6 +108,15 @@ export async function POST(req: NextRequest) {
     // rollback บัญชี auth ที่สร้างไว้ ไม่ให้ค้างเป็นบัญชีกำพร้า (ไม่ผูกกับพนักงานคนไหน)
     await admin.auth.admin.deleteUser(created.user.id);
     return NextResponse.json({ error: `สร้างพนักงานไม่สำเร็จ: ${empErr.message}` }, { status: 500 });
+  }
+
+  if (stationIds.length > 0) {
+    const { error: esErr } = await admin
+      .from('employee_stations')
+      .insert(stationIds.map((sid) => ({ employee_id: empRow.id, station_id: sid })));
+    if (esErr) {
+      return NextResponse.json({ error: `กำหนดแผนกไม่สำเร็จ: ${esErr.message}` }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true, employee: empRow });

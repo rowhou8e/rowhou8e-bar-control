@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAppState, useCurrentEmployee } from '@/lib/use-store';
+import { useAppState, useCurrentEmployee, useVisibleStations } from '@/lib/use-store';
 import { Header } from '@/components/Header';
 import { EmptyState, PrimaryButton } from '@/components/ui';
 import { formatThaiDate, formatThaiTime, getEmployeeName, isChecklistItemScheduledToday, isChecklistOverdue, toDateStr } from '@/lib/derive';
@@ -15,7 +15,7 @@ export default function ChecklistPage() {
   const [stationFilter, setStationFilter] = useState<string>('all');
 
   const todayStr = toDateStr(now);
-  const activeStations = stations.filter((s) => s.active).sort((a, b) => a.order - b.order);
+  const activeStations = useVisibleStations();
   const myStationId = employee?.stationId ?? null;
 
   const history = checklistRuns

@@ -27,3 +27,12 @@ export function useCurrentEmployee(): Employee | null {
   if (!session) return null;
   return employees.find((e) => e.id === session.employeeId) ?? null;
 }
+
+/** แผนกที่พนักงานคนนี้เข้าถึงได้ — owner/manager เห็นทุกแผนก, staff เห็นเฉพาะแผนกที่ถูกมอบหมาย */
+export function useVisibleStations() {
+  const { stations } = useAppState();
+  const employee = useCurrentEmployee();
+  const active = [...stations].filter((s) => s.active).sort((a, b) => a.order - b.order);
+  if (!employee || employee.role === 'owner' || employee.role === 'manager') return active;
+  return active.filter((s) => employee.stationIds.includes(s.id));
+}

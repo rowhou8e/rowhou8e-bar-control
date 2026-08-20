@@ -44,6 +44,8 @@ function NewChecklistForm() {
 
   const stationId = params.get('station') ?? employee?.stationId ?? '';
   const station = stations.find((s) => s.id === stationId);
+  const stationAllowed =
+    !station || !employee || employee.role !== 'staff' || employee.stationIds.includes(station.id);
   const activeItems = checklistTemplate.filter((t) => t.stationId === stationId && t.active && isChecklistItemScheduledToday(t, now)).sort((a, b) => a.order - b.order);
 
   const todayStr = toDateStr(now);
@@ -59,7 +61,7 @@ function NewChecklistForm() {
   );
   const [submitting, setSubmitting] = useState(false);
 
-  if (!station || activeItems.length === 0) {
+  if (!station || !stationAllowed || activeItems.length === 0) {
     return (
       <div>
         <Header title="ทำเช็กลิสต์" currentEmployee={employee} onBack={() => router.back()} />

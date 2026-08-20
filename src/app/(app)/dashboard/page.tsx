@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useAppState, useCurrentEmployee } from '@/lib/use-store';
+import { useAppState, useCurrentEmployee, useVisibleStations } from '@/lib/use-store';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
@@ -50,7 +50,6 @@ export default function DashboardPage() {
   const employee = useCurrentEmployee();
   const {
     employees,
-    stations,
     products,
     productLots,
     purchaseOrders,
@@ -62,7 +61,8 @@ export default function DashboardPage() {
   } = state;
 
   const todayStr = toDateStr(now);
-  const activeStations = stations.filter((s) => s.active).sort((a, b) => a.order - b.order);
+  const activeStations = useVisibleStations();
+  const departmentLabel = employee?.role === 'staff' ? 'แผนกของฉัน' : 'ทุกแผนก';
   const stationStatuses = activeStations.map((station) => {
     const todayRun = checklistRuns.find((r) => r.stationId === station.id && r.date === todayStr);
     return { station, todayRun, overdue: isChecklistOverdue(settings, todayRun, now, storeHolidays) };
@@ -80,7 +80,7 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
 
   const staffTasks: { label: string; done: boolean; href: string }[] = [
-    { label: 'ทำเช็กลิสต์วันนี้ (ทุกแผนก)', done: doneCount === stationStatuses.length, href: '/checklist' },
+    { label: `ทำเช็กลิสต์วันนี้ (${departmentLabel})`, done: doneCount === stationStatuses.length, href: '/checklist' },
     {
       label: 'ตรวจล็อตสินค้าที่ใกล้/หมดอายุ',
       done: productLots.every((l) => l.status !== 'expired' && l.status !== 'near_expiry'),
@@ -104,7 +104,7 @@ export default function DashboardPage() {
           }`}
         >
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-700">เช็กลิสต์วันนี้ (ทุกแผนก)</p>
+            <p className="text-sm font-semibold text-gray-700">เช็กลิสต์วันนี้ ({departmentLabel})</p>
             <Link href="/checklist" className="text-xs font-semibold text-brand-600">
               ดูทั้งหมด
             </Link>

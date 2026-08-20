@@ -1,4 +1,4 @@
-import type { PurchaseOrder, Supplier, Employee } from './types';
+import type { PurchaseOrder, Supplier, Employee, StockItem, StockCategory } from './types';
 import { formatThaiDate, formatThaiDateTime, getEmployeeName } from './derive';
 
 /**
@@ -16,6 +16,7 @@ const BORDER = '#CFCFCF';
 const ROW_ALT = '#F5F5F5';
 const HEADER_BG = '#EBEBEB';
 const TOTAL_BG = '#E0E0E0';
+const CATEGORY_BG = '#D6D6D6';
 
 const FONT_FAMILY = "'Noto Sans Thai', system-ui, sans-serif";
 
@@ -63,7 +64,9 @@ async function ensureFontsLoaded(): Promise<void> {
 async function renderPurchaseOrderImageBlob(
   po: PurchaseOrder,
   supplier: Supplier | undefined,
-  employees: Employee[]
+  employees: Employee[],
+  stockItems: StockItem[] = [],
+  stockCategories: StockCategory[] = []
 ): Promise<Blob | null> {
   if (typeof document === 'undefined') return null;
   await ensureFontsLoaded();
@@ -78,7 +81,7 @@ async function renderPurchaseOrderImageBlob(
   const mctx = measureCanvas.getContext('2d');
   if (!mctx) return null;
 
-  const headerH = 118;
+  const headerH = 140;
   const supplierY = headerH + 22;
   const hasContactLine = Boolean(supplier?.contactPerson || supplier?.phone);
   const supplierH = 20 + (hasContactLine ? 24 : 0) + (supplier?.address ? 22 : 0);
@@ -93,12 +96,43 @@ async function renderPurchaseOrderImageBlob(
   };
 
   mctx.font = `600 16px ${FONT_FAMILY}`;
-  const itemRows = po.items.map((it) => {
-    const lines = wrapText(mctx, it.itemName, col.nameW);
-    const rowH = Math.max(46, lines.length * 23 + 18);
-    return { it, lines, rowH };
+  type Item = PurchaseOrder['items'][number];
+  const CATEGORY_ROW_H = 32;
+  function categoryNameFor(it: Item): string {
+    if (!it.stockItemId) return 'อื่นๆ';
+    const stockItem = stockItems.find((s) => s.id === it.stockItemId);
+    if (!stockItem) return 'อื่นๆ';
+    const cat = stockCategories.find((c) => c.id === stockItem.categoryId);
+    return cat?.name ?? 'อื่นๆ';
+  }
+  const categoryOrder: string[] = [];
+  const categoryGroups = new Map<string, Item[]>();
+  po.items.forEach((it) => {
+    const cat = categoryNameFor(it);
+    if (!categoryGroups.has(cat)) {
+      categoryOrder.push(cat);
+      categoryGroups.set(cat, []);
+    }
+    categoryGroups.get(cat)!.push(it);
   });
-  const itemsTotalH = itemRows.reduce((sum, r) => sum + r.rowH, 0);
+  const showCategoryHeaders = categoryOrder.length > 1;
+
+  type TableRow =
+    | { kind: 'category'; name: string; count: number; h: number }
+    | { kind: 'item'; it: Item; lines: string[]; h: number };
+  const tableRows: TableRow[] = [];
+  categoryOrder.forEach((cat) => {
+    const items = categoryGroups.get(cat)!;
+    if (showCategoryHeaders) {
+      tableRows.push({ kind: 'category', name: cat, count: items.length, h: CATEGORY_ROW_H });
+    }
+    items.forEach((it) => {
+      const lines = wrapText(mctx, it.itemName, col.nameW);
+      const rowH = Math.max(46, lines.length * 23 + 18);
+      tableRows.push({ kind: 'item', it, lines, h: rowH });
+    });
+  });
+  const itemsTotalH = tableRows.reduce((sum, r) => sum + r.h, 0);
 
   const totalRowH = 56;
   mctx.font = `400 14px ${FONT_FAMILY}`;
@@ -132,6 +166,8 @@ async function renderPurchaseOrderImageBlob(
   ctx.fillText('ใบสั่งซื้อ (Purchase Order)', marginX, 76);
   ctx.font = `500 15px ${FONT_FAMILY}`;
   ctx.fillText(`วันที่สั่ง: ${formatThaiDate(po.orderDate)}`, marginX, 100);
+  ctx.font = `700 15px ${FONT_FAMILY}`;
+  ctx.fillText(`ผู้สั่งซื้อ: ${getEmployeeName(employees, po.createdBy)}`, marginX, 124);
 
   ctx.textAlign = 'right';
   ctx.font = `700 15px ${FONT_FAMILY}`;
@@ -181,11 +217,35 @@ async function renderPurchaseOrderImageBlob(
 
   // แถวรายการสินค้า
   let rowY = tableY + tableHeaderH;
-  itemRows.forEach(({ it, lines, rowH }, idx) => {
-    if (idx % 2 === 1) {
+  let itemIdx = 0;
+  tableRows.forEach((row) => {
+    if (row.kind === 'category') {
+      ctx.fillStyle = CATEGORY_BG;
+      ctx.fillRect(marginX, rowY, contentW, row.h);
+      ctx.fillStyle = BRAND_DARK;
+      ctx.font = `700 14px ${FONT_FAMILY}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${row.name} (${row.count} รายการ)`, col.nameX + 10, rowY + row.h / 2);
+      ctx.textBaseline = 'alphabetic';
+
+      ctx.strokeStyle = BORDER;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(marginX, rowY + row.h);
+      ctx.lineTo(W - marginX, rowY + row.h);
+      ctx.stroke();
+
+      rowY += row.h;
+      return;
+    }
+
+    const { it, lines, h: rowH } = row;
+    if (itemIdx % 2 === 1) {
       ctx.fillStyle = ROW_ALT;
       ctx.fillRect(marginX, rowY, contentW, rowH);
     }
+    itemIdx += 1;
     const centerY = rowY + rowH / 2;
     const lineH = 21;
     const startY = centerY - ((lines.length - 1) * lineH) / 2;
@@ -282,9 +342,11 @@ function triggerPurchaseOrderImageDownload(blob: Blob, filename: string) {
 export async function downloadPurchaseOrderImage(
   po: PurchaseOrder,
   supplier: Supplier | undefined,
-  employees: Employee[]
+  employees: Employee[],
+  stockItems: StockItem[] = [],
+  stockCategories: StockCategory[] = []
 ): Promise<void> {
-  const blob = await renderPurchaseOrderImageBlob(po, supplier, employees);
+  const blob = await renderPurchaseOrderImageBlob(po, supplier, employees, stockItems, stockCategories);
   if (!blob) return;
   triggerPurchaseOrderImageDownload(blob, purchaseOrderImageFilename(po, supplier));
 }
@@ -293,9 +355,11 @@ export async function downloadPurchaseOrderImage(
 export async function sharePurchaseOrderImage(
   po: PurchaseOrder,
   supplier: Supplier | undefined,
-  employees: Employee[]
+  employees: Employee[],
+  stockItems: StockItem[] = [],
+  stockCategories: StockCategory[] = []
 ): Promise<'shared' | 'downloaded' | 'cancelled'> {
-  const blob = await renderPurchaseOrderImageBlob(po, supplier, employees);
+  const blob = await renderPurchaseOrderImageBlob(po, supplier, employees, stockItems, stockCategories);
   if (!blob) return 'downloaded';
   const filename = purchaseOrderImageFilename(po, supplier);
 

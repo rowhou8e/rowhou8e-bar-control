@@ -21,7 +21,7 @@ export default function PurchaseOrderDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const employee = useCurrentEmployee();
-  const { purchaseOrders, suppliers, employees } = useAppState();
+  const { purchaseOrders, suppliers, employees, stockItems, stockCategories } = useAppState();
 
   const po = purchaseOrders.find((p) => p.id === params.id);
   const canManage = employee?.role === 'owner' || employee?.role === 'manager';
@@ -68,7 +68,7 @@ export default function PurchaseOrderDetailPage() {
     if (!po || generatingImage) return;
     setGeneratingImage(true);
     try {
-      await downloadPurchaseOrderImage(po, supplier, employees);
+      await downloadPurchaseOrderImage(po, supplier, employees, stockItems, stockCategories);
     } finally {
       setGeneratingImage(false);
     }
@@ -78,7 +78,7 @@ export default function PurchaseOrderDetailPage() {
     if (!po || sharingImage) return;
     setSharingImage(true);
     try {
-      await sharePurchaseOrderImage(po, supplier, employees);
+      await sharePurchaseOrderImage(po, supplier, employees, stockItems, stockCategories);
     } finally {
       setSharingImage(false);
     }

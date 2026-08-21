@@ -82,7 +82,7 @@ export default function DashboardPage() {
   const staffTasks: { label: string; done: boolean; href: string }[] = [
     { label: `ทำเช็กลิสต์วันนี้ (${departmentLabel})`, done: doneCount === stationStatuses.length, href: '/checklist' },
     {
-      label: 'ตรวจล็อตสินค้าที่ใกล้/หมดอายุ',
+      label: 'ตรวจออร์เดอร์เพิ่มที่ใกล้/หมดอายุ',
       done: productLots.every((l) => l.status !== 'expired' && l.status !== 'near_expiry'),
       href: '/milk',
     },
@@ -153,17 +153,17 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ล็อตสินค้าที่ผลิต */}
+        {/* ออร์เดอร์เพิ่มที่ผลิต */}
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-700">ล็อตสินค้า — ที่ใช้งานอยู่</h2>
+            <h2 className="text-sm font-bold text-gray-700">ออร์เดอร์เพิ่ม — ที่ใช้งานอยู่</h2>
             <Link href="/milk" className="text-xs font-semibold text-brand-600">
               ดูทั้งหมด
             </Link>
           </div>
           {activeLots.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-4 text-center text-sm text-gray-400">
-              ไม่มีล็อตสินค้าที่ใช้งานอยู่ในขณะนี้
+              ไม่มีออร์เดอร์เพิ่มที่ใช้งานอยู่ในขณะนี้
             </div>
           ) : (
             <div className="space-y-2">

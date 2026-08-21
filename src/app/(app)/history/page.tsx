@@ -12,7 +12,7 @@ const ACTION_LABELS: Record<HistoryActionType, string> = {
   order_reminder_ack: 'ยืนยันรับทราบแจ้งเตือนสั่งสินค้า',
   checklist_submit: 'ทำเช็กลิสต์',
   production_log: 'บันทึกการผลิต',
-  lot_status_change: 'เปลี่ยนสถานะล็อตสินค้า',
+  lot_status_change: 'เปลี่ยนสถานะออร์เดอร์เพิ่ม',
   stock_adjust: 'ปรับสต๊อก',
   waste_report: 'แจ้งของเสีย',
   purchase_create: 'สร้างรายการเสนอซื้อ',

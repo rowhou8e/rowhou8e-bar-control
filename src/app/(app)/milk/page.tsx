@@ -20,7 +20,7 @@ const FILTERS: { value: ProductLotStatus | 'all'; label: string }[] = [
   { value: 'discarded', label: 'ทิ้งแล้ว' },
 ];
 
-/** หน้า "ล็อตสินค้า" — แทนหน้านมต้มเดิม ใช้ได้กับทุกแผนกที่มีการผลิต (ครัวขนม/ครัวผลิตขนมปัง/ครัวบาร์น้ำ) */
+/** หน้า "ออร์เดอร์เพิ่ม" — แทนหน้านมต้มเดิม ใช้ได้กับทุกแผนกที่มีการผลิต (ครัวขนม/ครัวผลิตขนมปัง/ครัวบาร์น้ำ) */
 export default function ProductLotsPage() {
   const router = useRouter();
   const employee = useCurrentEmployee();
@@ -42,7 +42,7 @@ export default function ProductLotsPage() {
 
   return (
     <div>
-      <Header title="ล็อตสินค้า" subtitle="บันทึกและติดตามอายุสินค้าที่ผลิต (FIFO/FEFO)" currentEmployee={employee} />
+      <Header title="ออร์เดอร์เพิ่ม" subtitle="บันทึกและติดตามอายุสินค้าที่ผลิต (FIFO/FEFO)" currentEmployee={employee} />
       <main className="space-y-4 px-4 py-4">
         <PrimaryButton onClick={() => router.push('/milk/new')}>+ บันทึกล็อตการผลิตใหม่</PrimaryButton>
 
@@ -85,7 +85,7 @@ export default function ProductLotsPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <EmptyState icon="📦" title="ไม่พบล็อตสินค้าในหมวดนี้" />
+          <EmptyState icon="📦" title="ไม่พบออร์เดอร์เพิ่มในหมวดนี้" />
         ) : (
           <div className="space-y-2.5">
             {filtered.map((lot) => {

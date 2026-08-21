@@ -8,7 +8,7 @@ import { generateLiveNotifications, liveNotificationStationId } from '@/lib/deri
 const navItems = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: HomeIcon },
   { href: '/checklist', label: 'เช็กลิสต์', icon: ChecklistIcon },
-  { href: '/milk', label: 'ล็อตสินค้า', icon: MilkIcon },
+  { href: '/milk', label: 'ออร์เดอร์เพิ่ม', icon: MilkIcon },
   { href: '/order', label: 'สั่งสินค้า', icon: OrderIcon },
   { href: '/notifications', label: 'แจ้งเตือน', icon: BellIcon },
 ];

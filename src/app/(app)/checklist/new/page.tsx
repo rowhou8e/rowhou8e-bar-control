@@ -176,7 +176,7 @@ function NewChecklistForm() {
                       }`}
                     />
                   )}
-                  <PhotoAttach value={item.photoUrl} onChange={(url) => updateItem(idx, { photoUrl: url })} />
+                  <PhotoAttach value={item.photoUrl} onChange={(url) => updateItem(idx, { photoUrl: url })} bucket="checklist-photos" employeeId={employee?.id ?? ''} />
                 </div>
               )}
             </div>

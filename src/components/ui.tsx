@@ -1,6 +1,9 @@
 'use client';
 
 import type { Role } from '@/lib/types';
+import { useState } from 'react';
+import { getDataMode } from '@/lib/supabase/client';
+import { uploadPhoto } from '@/lib/supabase/queries';
 
 export function EmptyState({ icon = '🗒️', title, subtitle }: { icon?: string; title: string; subtitle?: string }) {
   return (
@@ -26,20 +29,43 @@ export function RoleGate({ role, allow, children }: { role: Role | undefined; al
   return <>{children}</>;
 }
 
-/** จำลองการแนบรูปภาพ — prototype: บันทึกเป็น data URL ในเบราว์เซอร์เท่านั้น
- *  production: อัปโหลดขึ้น Supabase Storage bucket "checklist-photos" / "production-photos" แล้วเก็บ URL จริง (ดู README) */
+/** แนบรูปภาพ – โหมด mock: เก็บเป็น data URL ในเบราว์เซอร์ / โหมด supabase: อัปโหลดขึ้น Supabase Storage bucket จริงแล้วเก็บ URL (ดู README) */
 export function PhotoAttach({
   value,
   onChange,
   label = 'แนบรูปภาพ',
+  bucket,
+  employeeId,
 }: {
   value: string | null;
   onChange: (url: string | null) => void;
   label?: string;
+  bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos';
+  employeeId: string;
 }) {
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    setUploadError(null);
+
+    if (getDataMode() === 'supabase') {
+      setUploading(true);
+      try {
+        const url = await uploadPhoto(bucket, file, employeeId);
+        onChange(url);
+      } catch (err) {
+        console.error(err);
+        setUploadError('อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => onChange(reader.result as string);
     reader.readAsDataURL(file);
@@ -62,11 +88,25 @@ export function PhotoAttach({
   }
 
   return (
-    <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 active:bg-gray-50">
-      <span className="text-xl">📷</span>
-      <span className="text-[10px]">{label}</span>
-      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
-    </label>
+    <div className="flex flex-col items-center gap-1">
+      <label
+        className={`flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 ${
+          uploading ? 'cursor-wait opacity-60' : 'cursor-pointer active:bg-gray-50'
+        }`}
+      >
+        <span className="text-xl">{uploading ? '⏳' : '📷'}</span>
+        <span className="text-[10px]">{uploading ? 'กำลังอัปโหลด...' : label}</span>
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFile}
+          disabled={uploading}
+        />
+      </label>
+      {uploadError && <p className="max-w-[80px] text-center text-[10px] text-red-500">{uploadError}</p>}
+    </div>
   );
 }
 

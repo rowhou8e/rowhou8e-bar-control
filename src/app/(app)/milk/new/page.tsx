@@ -264,7 +264,7 @@ export default function NewProductLotPage() {
         <div className="rounded-2xl bg-white p-4 shadow-card">
           <label className="text-xs font-semibold text-gray-500">รูปภาพฉลากหรือภาชนะ</label>
           <div className="mt-2">
-            <PhotoAttach value={photoUrl} onChange={setPhotoUrl} />
+            <PhotoAttach value={photoUrl} onChange={setPhotoUrl} bucket="production-photos" employeeId={employee?.id ?? ''} />
           </div>
         </div>
 

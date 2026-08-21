@@ -31,6 +31,31 @@ const REALTIME_TABLES = [
   'store_holidays', 'order_reminders', 'order_draft_picks', 'history_logs', 'app_settings',
 ];
 
+/** ตาราง -> ชื่อ resource ที่ต้องรีเฟรช ใช้ทั้งตอน realtime event จากคนอื่น (setupRealtime/scheduleRefetch)
+ *  หลายตารางอาจแตะ resource เดียวกัน (เช่น checklist_runs + checklist_entry_items -> checklistRuns) */
+const TABLE_RESOURCE: Record<string, string> = {
+  stations: 'stations',
+  employees: 'employees',
+  stock_categories: 'stockCategories',
+  stock_items: 'stockItems',
+  checklist_template_items: 'checklistTemplate',
+  checklist_runs: 'checklistRuns',
+  checklist_entry_items: 'checklistRuns',
+  products: 'products',
+  product_lots: 'productLots',
+  purchase_requests: 'purchaseRequests',
+  suppliers: 'suppliers',
+  supplier_item_prices: 'supplierItemPrices',
+  purchase_orders: 'purchaseOrdersAndRequests',
+  purchase_order_items: 'purchaseOrdersAndRequests',
+  store_holidays: 'storeHolidays',
+  order_reminders: 'orderReminders',
+  order_draft_picks: 'orderDraftPicks',
+  history_logs: 'historyLogs',
+  app_settings: 'settings',
+  cash_reports: 'cashReports',
+};
+
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -262,6 +287,117 @@ export class LiveStore {
     this.notify();
   }
 
+  /** รีเฟรชเฉพาะจุด (เพิ่มเติมจาก 4 ตัวด้านบน) — ครอบคลุมตารางที่เหลือทั้งหมด เพื่อให้ mutation ทุกตัว
+   *  และ realtime event ทุกตาราง อัปเดตเฉพาะส่วนของ state ที่เกี่ยวข้องจริง แทนการโหลดทั้งหมดใหม่ */
+  private async refetchStations() {
+    const stations = await q.fetchStations();
+    this.state = { ...this.state, stations };
+    this.notify();
+  }
+
+  private async refetchEmployees() {
+    const employees = await q.fetchEmployees();
+    this.state = { ...this.state, employees };
+    this.notify();
+  }
+
+  private async refetchStockItems() {
+    const stockItems = await q.fetchStockItems();
+    this.state = { ...this.state, stockItems };
+    this.notify();
+  }
+
+  private async refetchStockCategories() {
+    const stockCategories = await q.fetchStockCategories();
+    this.state = { ...this.state, stockCategories };
+    this.notify();
+  }
+
+  private async refetchChecklistTemplate() {
+    const checklistTemplate = await q.fetchChecklistTemplateItems();
+    this.state = { ...this.state, checklistTemplate };
+    this.notify();
+  }
+
+  private async refetchChecklistRuns() {
+    const checklistRuns = await q.fetchAllChecklistRuns();
+    this.state = { ...this.state, checklistRuns };
+    this.notify();
+  }
+
+  private async refetchProductLots() {
+    const productLots = await q.fetchProductLots();
+    this.state = { ...this.state, productLots };
+    this.notify();
+  }
+
+  private async refetchSuppliers() {
+    const suppliers = await q.fetchSuppliers();
+    this.state = { ...this.state, suppliers };
+    this.notify();
+  }
+
+  private async refetchSupplierItemPrices() {
+    const supplierItemPrices = await q.fetchSupplierItemPrices();
+    this.state = { ...this.state, supplierItemPrices };
+    this.notify();
+  }
+
+  private async refetchCashReports() {
+    const cashReports = await q.fetchCashReports();
+    this.state = { ...this.state, cashReports };
+    this.notify();
+  }
+
+  private async refetchStoreHolidays() {
+    const storeHolidays = await q.fetchStoreHolidays();
+    this.state = { ...this.state, storeHolidays };
+    this.notify();
+  }
+
+  private async refetchOrderDraftPicks() {
+    const orderDraftPicks = await q.fetchOrderDraftPicks();
+    this.state = { ...this.state, orderDraftPicks };
+    this.notify();
+  }
+
+  private async refetchSettings() {
+    const settings = await q.fetchSettings();
+    this.state = { ...this.state, settings };
+    this.notify();
+  }
+
+  private async refetchHistoryLogs() {
+    const historyLogs = await q.fetchHistoryLogs();
+    this.state = { ...this.state, historyLogs };
+    this.notify();
+  }
+
+  /** ตาราง -> ฟังก์ชันรีเฟรชเฉพาะจุดที่ตรงกัน ใช้ทั้งตอน mutation ของตัวเองและตอนรับ realtime event จากคนอื่น */
+  private async refetchResource(key: string) {
+    switch (key) {
+      case 'stations': return this.refetchStations();
+      case 'employees': return this.refetchEmployees();
+      case 'stockItems': return this.refetchStockItems();
+      case 'stockCategories': return this.refetchStockCategories();
+      case 'checklistTemplate': return this.refetchChecklistTemplate();
+      case 'checklistRuns': return this.refetchChecklistRuns();
+      case 'products': return this.refetchProducts();
+      case 'productLots': return this.refetchProductLots();
+      case 'purchaseRequests': return this.refetchPurchaseRequests();
+      case 'suppliers': return this.refetchSuppliers();
+      case 'supplierItemPrices': return this.refetchSupplierItemPrices();
+      case 'purchaseOrdersAndRequests': return this.refetchPurchaseOrdersAndRequests();
+      case 'storeHolidays': return this.refetchStoreHolidays();
+      case 'orderReminders': return this.refetchOrderReminders();
+      case 'orderDraftPicks': return this.refetchOrderDraftPicks();
+      case 'historyLogs': return this.refetchHistoryLogs();
+      case 'settings': return this.refetchSettings();
+      case 'cashReports': return this.refetchCashReports();
+      default: return;
+    }
+  }
+
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -276,12 +412,22 @@ export class LiveStore {
   }
 
   /** debounce refetch — เวลามีหลาย postgres_changes events รัวกัน (เช่น สร้างใบสั่งซื้อ+รายการในนั้นพร้อมกัน)
-   *  ไม่อยาก refetch ซ้ำหลายรอบติดกัน */
-  private scheduleRefetch() {
+   *  ไม่อยาก refetch ซ้ำหลายรอบติดกัน — และรีเฟรชเฉพาะ resource ของตารางที่เปลี่ยนจริง ไม่ใช่โหลดทั้งหมดใหม่
+   *  (ถ้าหลายตารางเปลี่ยนพร้อมกันในช่วง debounce เดียว จะรวมกันแล้วรีเฟรชแต่ละ resource แค่ครั้งเดียว) */
+  private pendingRefetchTables = new Set<string>();
+
+  private scheduleRefetch(table: string) {
+    this.pendingRefetchTables.add(table);
     if (this.refetchTimer) clearTimeout(this.refetchTimer);
     this.refetchTimer = setTimeout(() => {
       this.refetchTimer = null;
-      this.refetchAll();
+      const tables = Array.from(this.pendingRefetchTables);
+      this.pendingRefetchTables.clear();
+      const resourceKeys = new Set(tables.map((t) => TABLE_RESOURCE[t]).filter((k): k is string => Boolean(k)));
+      Promise.all(Array.from(resourceKeys).map((key) => this.refetchResource(key))).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[LiveStore] scoped refetch จาก realtime event ล้มเหลว (จะลองใหม่ตอน event ถัดไป)', err);
+      });
     }, 400);
   }
 
@@ -297,7 +443,7 @@ export class LiveStore {
     const tables = role === 'owner' || role === 'manager' ? [...REALTIME_TABLES, 'cash_reports'] : REALTIME_TABLES;
     let channel = sb.channel('app-changes');
     for (const table of tables) {
-      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => this.scheduleRefetch());
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => this.scheduleRefetch(table));
     }
     channel.subscribe();
     this.realtimeChannel = channel;
@@ -358,7 +504,7 @@ export class LiveStore {
     backdatedReason: string | null
   ) {
     await q.submitChecklist(stationId, dateStr || todayStr(), items, employeeId, backdatedReason);
-    await this.refetchAll();
+    await this.refetchChecklistRuns();
   }
 
   // ================= สินค้าที่ผลิต (Products) =================
@@ -389,23 +535,23 @@ export class LiveStore {
     photoUrl: string | null;
   }) {
     await q.createProductLot(input);
-    await this.refetchAll();
+    await this.refetchProductLots();
   }
 
   async setProductLotStatus(id: string, status: ProductLotStatus, employeeId: string) {
     await q.setProductLotStatus(id, status, employeeId);
-    await this.refetchAll();
+    await this.refetchProductLots();
   }
 
   // ================= STOCK =================
   async adjustStock(id: string, quantity: number, note: string, employeeId: string) {
     await q.adjustStockQuantity(id, quantity, note, employeeId);
-    await this.refetchAll();
+    await this.refetchStockItems();
   }
 
   async markStockUnusable(id: string, note: string, employeeId: string) {
     await q.markStockUnusable(id, note, employeeId);
-    await this.refetchAll();
+    await this.refetchStockItems();
   }
 
   // ================= PURCHASE REQUESTS =================
@@ -426,13 +572,14 @@ export class LiveStore {
 
   async updatePurchaseRequestStatus(id: string, status: PurchaseRequestStatus, employeeId: string) {
     await q.updatePurchaseRequestStatus(id, status, employeeId);
-    await this.refetchAll();
+    // status 'received' อาจเพิ่มจำนวนกลับเข้าสต๊อกด้วย (ดู queries.ts) — รีเฟรชทั้งสองจุด
+    await Promise.all([this.refetchPurchaseRequests(), this.refetchStockItems()]);
   }
 
   // ================= SETTINGS =================
   async updateSettings(patch: Partial<AppSettings>, employeeId: string) {
     await q.updateSettings(patch, employeeId);
-    await this.refetchAll();
+    await this.refetchSettings();
   }
 
   /** เพิ่มพนักงานใหม่ — สร้างบัญชี Supabase Auth (email/password) ผ่าน API route ฝั่งเซิร์ฟเวอร์ แล้วผูกกับแถวพนักงานใหม่ */
@@ -448,7 +595,7 @@ export class LiveStore {
     actorId: string;
   }) {
     await q.createEmployee(input);
-    await this.refetchAll();
+    await this.refetchEmployees();
   }
 
   async updateEmployee(
@@ -457,7 +604,7 @@ export class LiveStore {
     actorId: string
   ) {
     await q.updateEmployee(id, patch, actorId);
-    await this.refetchAll();
+    await this.refetchEmployees();
   }
 
   /** เจ้าของร้านตั้งรหัสผ่านใหม่ให้พนักงานคนอื่น — ผ่าน API route ฝั่งเซิร์ฟเวอร์ (ดู queries.ts) */
@@ -477,7 +624,7 @@ export class LiveStore {
     actorId: string;
   }) {
     await q.createStockItem(input);
-    await this.refetchAll();
+    await this.refetchStockItems();
   }
 
   async updateStockItemDetails(
@@ -486,33 +633,33 @@ export class LiveStore {
     actorId: string
   ) {
     await q.updateStockItemDetails(id, patch, actorId);
-    await this.refetchAll();
+    await this.refetchStockItems();
   }
 
   async deleteStockItem(id: string, actorId: string) {
     await q.deleteStockItem(id, actorId);
-    await this.refetchAll();
+    await this.refetchStockItems();
   }
 
   async updateStockCategoryName(id: string, name: string, actorId: string) {
     await q.updateStockCategoryName(id, name, actorId);
-    await this.refetchAll();
+    await this.refetchStockCategories();
   }
 
   async createStockCategory(input: { name: string; actorId: string }) {
     await q.createStockCategory(input);
-    await this.refetchAll();
+    await this.refetchStockCategories();
   }
 
   async deleteStockCategory(id: string, actorId: string) {
     await q.deleteStockCategory(id, actorId);
-    await this.refetchAll();
+    await this.refetchStockCategories();
   }
 
   // ================= ผู้ขาย/ซัพพลายเออร์ (Suppliers) =================
   async createSupplier(input: { name: string; contactPerson: string; phone: string; address: string; note: string; actorId: string }) {
     await q.createSupplier(input);
-    await this.refetchAll();
+    await this.refetchSuppliers();
   }
 
   async updateSupplier(
@@ -521,17 +668,17 @@ export class LiveStore {
     actorId: string
   ) {
     await q.updateSupplier(id, patch, actorId);
-    await this.refetchAll();
+    await this.refetchSuppliers();
   }
 
   async deleteSupplier(id: string, actorId: string) {
     await q.deleteSupplier(id, actorId);
-    await this.refetchAll();
+    await this.refetchSuppliers();
   }
 
   async addSupplierItemPrice(input: { supplierId: string; stockItemId: string; unit: string; price: number; note: string; actorId: string }) {
     await q.addSupplierItemPrice(input);
-    await this.refetchAll();
+    await this.refetchSupplierItemPrices();
   }
 
   // ================= ใบสั่งซื้อ (Purchase Orders) =================
@@ -554,12 +701,13 @@ export class LiveStore {
 
   async updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, actorId: string) {
     await q.updatePurchaseOrderStatus(id, status, actorId);
-    await this.refetchAll();
+    // status 'received' อาจเพิ่มจำนวนกลับเข้าสต๊อกด้วย (ดู queries.ts) — รีเฟรชทั้งสองจุด
+    await Promise.all([this.refetchPurchaseOrdersAndRequests(), this.refetchStockItems()]);
   }
 
   async updatePurchaseOrderItemPrice(purchaseOrderId: string, itemId: string, unitPrice: number, actorId: string) {
     await q.updatePurchaseOrderItemPrice(purchaseOrderId, itemId, unitPrice, actorId);
-    await this.refetchAll();
+    await this.refetchPurchaseOrdersAndRequests();
   }
 
   async addPurchaseOrderItem(input: {
@@ -572,33 +720,33 @@ export class LiveStore {
     actorId: string;
   }) {
     await q.addPurchaseOrderItem(input);
-    await this.refetchAll();
+    await this.refetchPurchaseOrdersAndRequests();
   }
 
   async removePurchaseOrderItem(purchaseOrderId: string, itemId: string, actorId: string) {
     await q.removePurchaseOrderItem(purchaseOrderId, itemId, actorId);
-    await this.refetchAll();
+    await this.refetchPurchaseOrdersAndRequests();
   }
 
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   async submitCashReport(input: { date: string; closingAmount: number; note: string; actorId: string }) {
     await q.submitCashReport(input);
-    await this.refetchAll();
+    await this.refetchCashReports();
   }
 
   async updateCashReport(id: string, patch: { closingAmount?: number; note?: string }, actorId: string) {
     await q.updateCashReport(id, patch, actorId);
-    await this.refetchAll();
+    await this.refetchCashReports();
   }
 
   async sendOrderReminder(input: { stationId: string; message: string; actorId: string }) {
     await q.sendOrderReminder(input);
-    await this.refetchAll();
+    await this.refetchOrderReminders();
   }
 
   async acknowledgeOrderReminder(id: string, input: { willOrder: boolean; note: string }, actorId: string) {
     await q.acknowledgeOrderReminder(id, input, actorId);
-    await this.refetchAll();
+    await this.refetchOrderReminders();
   }
 
   async deleteOrderReminder(id: string, actorId: string) {
@@ -609,39 +757,39 @@ export class LiveStore {
   // ================= ติ๊กเลือกสินค้าแบบเรียลไทม์ที่หน้า "สั่งสินค้า" (ก่อนบันทึกสั่งซื้อจริง) =================
   async setOrderDraftPick(stockItemId: string, quantity: number, employeeId: string) {
     await q.setOrderDraftPick(stockItemId, quantity, employeeId);
-    await this.refetchAll();
+    await this.refetchOrderDraftPicks();
   }
 
   async clearOrderDraftPick(stockItemId: string, employeeId: string) {
     await q.clearOrderDraftPick(stockItemId, employeeId);
-    await this.refetchAll();
+    await this.refetchOrderDraftPicks();
   }
 
   // ================= วันหยุดร้าน (owner/manager เท่านั้น) — เฟส 4 =================
   async addStoreHoliday(input: { date: string; label: string; actorId: string }) {
     await q.addStoreHoliday(input);
-    await this.refetchAll();
+    await this.refetchStoreHolidays();
   }
 
   async removeStoreHoliday(id: string, actorId: string) {
     await q.removeStoreHoliday(id, actorId);
-    await this.refetchAll();
+    await this.refetchStoreHolidays();
   }
 
   // ================= แผนก/สถานี (Stations) — owner เท่านั้น =================
   async createStation(input: { name: string; hasProduction: boolean; actorId: string }) {
     await q.createStation(input);
-    await this.refetchAll();
+    await this.refetchStations();
   }
 
   async updateStation(id: string, patch: { name?: string; hasProduction?: boolean }, actorId: string) {
     await q.updateStation(id, patch, actorId);
-    await this.refetchAll();
+    await this.refetchStations();
   }
 
   async deleteStation(id: string, actorId: string) {
     await q.deleteStation(id, actorId);
-    await this.refetchAll();
+    await this.refetchStations();
   }
 
   // ================= จัดการรายการเช็กลิสต์ =================
@@ -654,7 +802,7 @@ export class LiveStore {
     monthlyDay?: number | null;
   }) {
     await q.createChecklistTemplateItem(input);
-    await this.refetchAll();
+    await this.refetchChecklistTemplate();
   }
 
   async updateChecklistTemplateItem(
@@ -663,11 +811,11 @@ export class LiveStore {
     actorId: string
   ) {
     await q.updateChecklistTemplateItem(id, patch, actorId);
-    await this.refetchAll();
+    await this.refetchChecklistTemplate();
   }
 
   async deleteChecklistTemplateItem(id: string, actorId: string) {
     await q.deleteChecklistTemplateItem(id, actorId);
-    await this.refetchAll();
+    await this.refetchChecklistTemplate();
   }
 }

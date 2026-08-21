@@ -72,7 +72,7 @@ export default function DashboardPage() {
 
   const notReceivedOrders = purchaseOrders.filter((po) => po.status === 'sent' || po.status === 'confirmed').length;
   // สรุปการเงิน — เจ้าของร้านเท่านั้น (ผู้จัดการทำได้ทุกอย่างยกเว้นส่วนนี้)
-  const canManageCash = employee?.role === 'owner';
+  const canManageCash = employee?.role === 'owner' || employee?.role === 'manager';
   const todayCashReport = cashReports.find((r) => r.date === todayStr);
 
   const activeLots = productLots

@@ -241,14 +241,14 @@ create policy "purchase_order_items_delete_owner_manager"
   using (public.current_employee_role() in ('owner', 'manager'));
 
 -- ---------------- CASH REPORTS (รายงานเงินสดปิดร้าน — เห็น/บันทึกได้เฉพาะ owner/manager, append-only) ----------------
-create policy "cash_reports_select_owner"
+create policy "cash_reports_select_owner_manager"
   on public.cash_reports for select
-  -- สรุปการเงิน/รายงานเงินสด: เจ้าของร้านเท่านั้น (ผู้จัดการทำได้ทุกอย่างยกเว้นส่วนนี้)
-  using (public.current_employee_role() = 'owner');
+  -- สรุปการเงิน/รายงานเงินสด: เจ้าของร้านและผู้จัดการ
+  using (public.current_employee_role() in ('owner', 'manager'));
 
-create policy "cash_reports_insert_owner"
+create policy "cash_reports_insert_owner_manager"
   on public.cash_reports for insert
-  with check (public.current_employee_role() = 'owner');
+  with check (public.current_employee_role() in ('owner', 'manager'));
 -- ไม่มี policy UPDATE/DELETE — รายงานเงินสดเป็นประวัติ ห้ามแก้ไข/ลบ ต้องบันทึกใหม่เท่านั้น
 
 -- ---------------- STORE HOLIDAYS (วันหยุดร้าน) ----------------

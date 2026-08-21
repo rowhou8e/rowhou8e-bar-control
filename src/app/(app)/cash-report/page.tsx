@@ -61,6 +61,7 @@ export default function CashReportPage() {
 
   // สรุปการเงิน/รายงานเงินสด — เจ้าของร้านเท่านั้น (ผู้จัดการทำได้ทุกอย่างยกเว้นส่วนนี้)
   const isOwner = employee?.role === 'owner';
+  const canManageCash = isOwner || employee?.role === 'manager';
 
   const recordedDates = useMemo(() => new Set(cashReports.map((r) => r.date)), [cashReports]);
   const overviewMonths = useMemo(() => buildOverviewMonths(now, recordedDates, BACKFILL_MONTHS), [now, recordedDates]);
@@ -72,14 +73,14 @@ export default function CashReportPage() {
     [overviewMonths]
   );
 
-  if (employee && !isOwner) {
+  if (employee && !canManageCash) {
     return (
       <div>
         <Header title="รายงานเงินสด" currentEmployee={employee} onBack={() => router.back()} />
         <main className="px-4 py-10 text-center">
           <p className="text-4xl">🔒</p>
-          <p className="mt-3 text-sm font-semibold text-gray-700">หน้านี้สำหรับเจ้าของร้านเท่านั้น</p>
-          <p className="mt-1 text-xs text-gray-400">ติดต่อเจ้าของร้านหากต้องการดูหรือบันทึกรายงานเงินสด</p>
+          <p className="mt-3 text-sm font-semibold text-gray-700">หน้านี้สำหรับเจ้าของร้านและผู้จัดการเท่านั้น</p>
+          <p className="mt-1 text-xs text-gray-400">ติดต่อเจ้าของร้านหรือผู้จัดการหากต้องการดูหรือบันทึกรายงานเงินสด</p>
         </main>
       </div>
     );

@@ -25,6 +25,8 @@ const ACTION_LABELS: Record<HistoryActionType, string> = {
   cash_report_submit: 'บันทึกรายงานเงินสด',
   cash_report_edit: 'แก้ไขรายงานเงินสด',
     po_price_update: 'แก้ไขราคาในใบสั่งซื้อ',
+    po_item_add: 'เพิ่มรายการในใบสั่งซื้อ',
+    po_item_remove: 'ลบรายการในใบสั่งซื้อ',
 };
 
 const ACTION_ICON: Record<HistoryActionType, string> = {
@@ -45,6 +47,8 @@ const ACTION_ICON: Record<HistoryActionType, string> = {
   cash_report_submit: '💵',
   cash_report_edit: '✏️',
     po_price_update: '💰',
+    po_item_add: '➕',
+    po_item_remove: '➖',
 };
 
 export default function HistoryPage() {

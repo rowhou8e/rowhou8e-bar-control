@@ -289,6 +289,8 @@ export type HistoryActionType =
   | 'po_create' // สร้าง/รวมใบสั่งซื้อ
   | 'po_status_change' // เปลี่ยนสถานะใบสั่งซื้อ (ส่งแล้ว/ยืนยันแล้ว/รับแล้ว/ยกเลิก)
   | 'po_price_update' // แก้ไขราคาต่อหน่วยของรายการในใบสั่งซื้อ (ระหว่างสถานะร่าง)
+  | 'po_item_add' // เพิ่มรายการวัตถุดิบใหม่ในใบสั่งซื้อฉบับร่าง
+  | 'po_item_remove' // ลบรายการวัตถุดิบออกจากใบสั่งซื้อฉบับร่าง
   | 'cash_report_submit' // บันทึกรายงานเงินสดปิดร้าน — เฟส 3
   | 'cash_report_edit' // แก้ไขรายงานเงินสดปิดร้านที่บันทึกไว้แล้ว
   | 'order_reminder_send' // เจ้าของ/ผู้จัดการส่งแจ้งเตือนให้แผนกสั่งสินค้า — เฟส 5
@@ -591,6 +593,18 @@ export interface AppStore {
    */
   updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, actorId: string): void | Promise<void>;
   updatePurchaseOrderItemPrice(purchaseOrderId: string, itemId: string, unitPrice: number, actorId: string): void | Promise<void>;
+  /** เพิ่มรายการวัตถุดิบใหม่เข้าใบสั่งซื้อฉบับร่าง (ยังไม่ส่งให้ผู้ขาย) — ตั้งราคาต่อหน่วยได้เอง */
+  addPurchaseOrderItem(input: {
+    purchaseOrderId: string;
+    stockItemId: string | null;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    actorId: string;
+  }): void | Promise<void>;
+  /** ลบรายการสินค้าออกจากใบสั่งซื้อฉบับร่าง (ลบได้เฉพาะขณะยังเป็นฉบับร่าง) */
+  removePurchaseOrderItem(purchaseOrderId: string, itemId: string, actorId: string): void | Promise<void>;
 
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   /** บันทึกรายงานเงินสดของวันที่ระบุ */

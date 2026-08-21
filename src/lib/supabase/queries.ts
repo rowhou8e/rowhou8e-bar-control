@@ -1199,6 +1199,82 @@ export async function updatePurchaseOrderItemPrice(purchaseOrderId: string, item
   });
 }
 
+/** เพิ่มรายการวัตถุดิบใหม่เข้าใบสั่งซื้อฉบับร่าง (ยังไม่ส่งให้ผู้ขาย) — ตั้งราคาต่อหน่วยได้เอง */
+export async function addPurchaseOrderItem(input: {
+  purchaseOrderId: string;
+  stockItemId: string | null;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  actorId: string;
+}): Promise<void> {
+  const sb = getSupabaseClient();
+
+  const { data: order, error: orderError } = await sb
+    .from('purchase_orders')
+    .select('id, status, supplier_id')
+    .eq('id', input.purchaseOrderId)
+    .single();
+  if (orderError) throw orderError;
+  if (!order) throw new Error('ไม่พบใบสั่งซื้อนี้');
+  if (order.status !== 'draft') throw new Error('เพิ่มรายการได้เฉพาะใบสั่งซื้อที่ยังเป็นฉบับร่างเท่านั้น');
+
+  const { error } = await sb.from('purchase_order_items').insert({
+    purchase_order_id: input.purchaseOrderId,
+    stock_item_id: input.stockItemId,
+    item_name: input.itemName,
+    quantity: input.quantity,
+    unit: input.unit,
+    unit_price: input.unitPrice,
+    source_purchase_request_id: null,
+  });
+  if (error) throw error;
+
+  const { data: supplier } = await sb.from('suppliers').select('name').eq('id', order.supplier_id).single();
+  await sb.from('history_logs').insert({
+    action_type: 'po_item_add',
+    actor_id: input.actorId,
+    target_label: `ใบสั่งซื้อ · ${supplier?.name ?? order.supplier_id}`,
+    detail: `เพิ่มรายการ "${input.itemName}" ${input.quantity} ${input.unit} ราคา ${input.unitPrice.toLocaleString()} บาท`,
+  });
+}
+
+/** ลบรายการสินค้าออกจากใบสั่งซื้อฉบับร่าง (ลบได้เฉพาะขณะยังเป็นฉบับร่าง) */
+export async function removePurchaseOrderItem(purchaseOrderId: string, itemId: string, actorId: string): Promise<void> {
+  const sb = getSupabaseClient();
+
+  const { data: order, error: orderError } = await sb
+    .from('purchase_orders')
+    .select('id, status, supplier_id')
+    .eq('id', purchaseOrderId)
+    .single();
+  if (orderError) throw orderError;
+  if (!order) throw new Error('ไม่พบใบสั่งซื้อนี้');
+  if (order.status !== 'draft') throw new Error('ลบรายการได้เฉพาะใบสั่งซื้อที่ยังเป็นฉบับร่างเท่านั้น');
+
+  const { data: item } = await sb
+    .from('purchase_order_items')
+    .select('item_name, quantity, unit')
+    .eq('id', itemId)
+    .single();
+
+  const { error } = await sb
+    .from('purchase_order_items')
+    .delete()
+    .eq('id', itemId)
+    .eq('purchase_order_id', purchaseOrderId);
+  if (error) throw error;
+
+  const { data: supplier } = await sb.from('suppliers').select('name').eq('id', order.supplier_id).single();
+  await sb.from('history_logs').insert({
+    action_type: 'po_item_remove',
+    actor_id: actorId,
+    target_label: `ใบสั่งซื้อ · ${supplier?.name ?? order.supplier_id}`,
+    detail: `ลบรายการ "${item?.item_name ?? itemId}" ${item?.quantity ?? ''} ${item?.unit ?? ''}`,
+  });
+}
+
 // ================= รายงานเงินสดปิดร้าน (แบบง่าย — append-only) — เฟส 3 =================
 export async function fetchCashReports(): Promise<CashReport[]> {
   const sb = getSupabaseClient();

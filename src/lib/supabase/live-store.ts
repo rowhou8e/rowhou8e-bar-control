@@ -562,6 +562,24 @@ export class LiveStore {
     await this.refetchAll();
   }
 
+  async addPurchaseOrderItem(input: {
+    purchaseOrderId: string;
+    stockItemId: string | null;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    actorId: string;
+  }) {
+    await q.addPurchaseOrderItem(input);
+    await this.refetchAll();
+  }
+
+  async removePurchaseOrderItem(purchaseOrderId: string, itemId: string, actorId: string) {
+    await q.removePurchaseOrderItem(purchaseOrderId, itemId, actorId);
+    await this.refetchAll();
+  }
+
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   async submitCashReport(input: { date: string; closingAmount: number; note: string; actorId: string }) {
     await q.submitCashReport(input);

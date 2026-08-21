@@ -55,6 +55,7 @@ import type {
   ProductLot,
   ProductLotStatus,
   PurchaseOrder,
+  PurchaseOrderItem,
   PurchaseOrderStatus,
   PurchaseRequest,
   PurchaseRequestStatus,
@@ -847,6 +848,69 @@ class Store {
         `แก้ไขราคา "${item.itemName}" เป็น ${unitPrice.toLocaleString()} บาท/${item.unit}`
       );
 
+      return { ...s, purchaseOrders };
+    });
+  }
+
+  addPurchaseOrderItem(input: {
+    purchaseOrderId: string;
+    stockItemId: string | null;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    actorId: string;
+  }) {
+    this.update((s) => {
+      const order = s.purchaseOrders.find((po) => po.id === input.purchaseOrderId);
+      if (!order || order.status !== 'draft') return s;
+  
+      const newItem: PurchaseOrderItem = {
+        id: nextId('poi'),
+        purchaseOrderId: input.purchaseOrderId,
+        stockItemId: input.stockItemId,
+        itemName: input.itemName,
+        quantity: input.quantity,
+        unit: input.unit,
+        unitPrice: input.unitPrice,
+        sourcePurchaseRequestId: null,
+      };
+  
+      const purchaseOrders = s.purchaseOrders.map((po) =>
+        po.id === input.purchaseOrderId ? { ...po, items: [...po.items, newItem] } : po
+      );
+  
+      const supplier = s.suppliers.find((x) => x.id === order.supplierId);
+      this.log(
+        'po_item_add',
+        input.actorId,
+        `ใบสั่งซื้อ · ${supplier?.name ?? order.supplierId}`,
+        `เพิ่มรายการ "${input.itemName}" ${input.quantity} ${input.unit} ราคา ${input.unitPrice.toLocaleString()} บาท`
+      );
+  
+      return { ...s, purchaseOrders };
+    });
+  }
+  
+  removePurchaseOrderItem(purchaseOrderId: string, itemId: string, actorId: string) {
+    this.update((s) => {
+      const order = s.purchaseOrders.find((po) => po.id === purchaseOrderId);
+      if (!order || order.status !== 'draft') return s;
+      const item = order.items.find((it) => it.id === itemId);
+      if (!item) return s;
+  
+      const purchaseOrders = s.purchaseOrders.map((po) =>
+        po.id === purchaseOrderId ? { ...po, items: po.items.filter((it) => it.id !== itemId) } : po
+      );
+  
+      const supplier = s.suppliers.find((x) => x.id === order.supplierId);
+      this.log(
+        'po_item_remove',
+        actorId,
+        `ใบสั่งซื้อ · ${supplier?.name ?? order.supplierId}`,
+        `ลบรายการ "${item.itemName}" ${item.quantity} ${item.unit}`
+      );
+  
       return { ...s, purchaseOrders };
     });
   }

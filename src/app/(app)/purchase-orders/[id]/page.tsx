@@ -7,7 +7,7 @@ import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/ui';
-import { formatThaiDate, formatThaiDateTime, getEmployeeName } from '@/lib/derive';
+import { formatThaiDate, formatThaiDateTime, getEmployeeName, latestSupplierPricesForItem } from '@/lib/derive';
 import { downloadPurchaseOrderImage, sharePurchaseOrderImage } from '@/lib/order-image';
 import type { PurchaseOrderStatus } from '@/lib/types';
 
@@ -21,12 +21,17 @@ export default function PurchaseOrderDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const employee = useCurrentEmployee();
-  const { purchaseOrders, suppliers, employees, stockItems, stockCategories } = useAppState();
+  const { purchaseOrders, suppliers, employees, stockItems, stockCategories, supplierItemPrices } = useAppState();
 
   const po = purchaseOrders.find((p) => p.id === params.id);
   const canManage = employee?.role === 'owner' || employee?.role === 'manager';
   const [generatingImage, setGeneratingImage] = useState(false);
   const [sharingImage, setSharingImage] = useState(false);
+  const [newItemStockId, setNewItemStockId] = useState('');
+  const [newItemQty, setNewItemQty] = useState('1');
+  const [newItemPrice, setNewItemPrice] = useState('');
+  const [addingItem, setAddingItem] = useState(false);
+  const [removingItemId, setRemovingItemId] = useState<string | null>(null);
 
   if (!po) {
     return (
@@ -44,6 +49,55 @@ export default function PurchaseOrderDetailPage() {
   const next = NEXT_STATUS[po.status];
   const canCancel = po.status === 'draft' || po.status === 'sent' || po.status === 'confirmed';
   const canEditPrice = po.status !== 'cancelled';
+
+  const supplierStockItems = stockItems
+    .filter((it) => it.active && it.supplierId === po.supplierId)
+    .sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+  function defaultPriceFor(stockItemId: string): number | '' {
+    const latest = latestSupplierPricesForItem(supplierItemPrices, stockItemId).find(
+      (p) => p.supplierId === po!.supplierId
+    );
+    return latest ? latest.price : '';
+  }
+
+  async function handleAddItem() {
+    if (!employee || !po) return;
+    const stockItem = stockItems.find((it) => it.id === newItemStockId);
+    if (!stockItem) return;
+    const quantity = Number(newItemQty);
+    const unitPrice = Number(newItemPrice);
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) return;
+    setAddingItem(true);
+    try {
+      await store.addPurchaseOrderItem({
+        purchaseOrderId: po.id,
+        stockItemId: stockItem.id,
+        itemName: stockItem.name,
+        quantity,
+        unit: stockItem.unit,
+        unitPrice,
+        actorId: employee.id,
+      });
+      setNewItemStockId('');
+      setNewItemQty('1');
+      setNewItemPrice('');
+    } finally {
+      setAddingItem(false);
+    }
+  }
+
+  async function handleRemoveItem(itemId: string) {
+    if (!employee || !po) return;
+    if (typeof window !== 'undefined' && !window.confirm('ลบรายการนี้ออกจากใบสั่งซื้อ?')) return;
+    setRemovingItemId(itemId);
+    try {
+      await store.removePurchaseOrderItem(po.id, itemId, employee.id);
+    } finally {
+      setRemovingItemId(null);
+    }
+  }
 
   function handleAdvance() {
     if (!employee || !next) return;
@@ -162,6 +216,16 @@ export default function PurchaseOrderDetailPage() {
             ) : (
               <p className="shrink-0 font-bold text-gray-700">{(it.quantity * it.unitPrice).toLocaleString()} บาท</p>
             )}
+            {po.status === 'draft' && canManage && (
+              <button
+                type="button"
+                onClick={() => handleRemoveItem(it.id)}
+                disabled={removingItemId === it.id}
+                className="ml-2 shrink-0 rounded-lg border border-status-danger px-2 py-1 text-[11px] font-bold text-status-danger active:bg-status-dangerBg disabled:opacity-50"
+              >
+                {removingItemId === it.id ? '...' : 'ลบ'}
+              </button>
+            )}
           </div>
         ))}
           </div>
@@ -169,6 +233,66 @@ export default function PurchaseOrderDetailPage() {
             <p className="text-xs font-semibold text-gray-500">รวมทั้งหมด</p>
             <p className="text-sm font-extrabold text-gray-900">{total.toLocaleString()} บาท</p>
           </div>
+
+        {po.status === 'draft' && (
+          <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+            <p className="text-xs font-bold text-gray-700">เพิ่มรายการวัตถุดิบจาก{supplier?.name ?? 'ผู้ขายรายนี้'}</p>
+            {supplierStockItems.length === 0 ? (
+              <p className="text-[11px] text-gray-400">ไม่มีวัตถุดิบที่ผูกกับผู้ขายรายนี้ — ตั้งค่าผู้ขายของวัตถุดิบได้ที่หน้าตั้งค่า</p>
+            ) : (
+              <div className="space-y-2">
+                <select
+                  value={newItemStockId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setNewItemStockId(id);
+                    const price = defaultPriceFor(id);
+                    setNewItemPrice(price === '' ? '' : String(price));
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs text-gray-700"
+                >
+                  <option value="">เลือกวัตถุดิบ...</option>
+                  {supplierStockItems.map((it) => (
+                    <option key={it.id} value={it.id}>
+                      {it.name} ({it.unit})
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={newItemQty}
+                    onChange={(e) => setNewItemQty(e.target.value)}
+                    placeholder="จำนวน"
+                    className="w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-right text-xs text-gray-700"
+                  />
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={newItemPrice}
+                    onChange={(e) => setNewItemPrice(e.target.value)}
+                    placeholder="ราคา/หน่วย"
+                    className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-right text-xs text-gray-700"
+                  />
+                  <span className="text-[11px] text-gray-400">บาท</span>
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    disabled={!newItemStockId || addingItem}
+                    className="ml-auto shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white active:bg-brand-700 disabled:opacity-50"
+                >
+                  {addingItem ? 'กำลังเพิ่ม...' : '+ เพิ่ม'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         </div>
 
         <button

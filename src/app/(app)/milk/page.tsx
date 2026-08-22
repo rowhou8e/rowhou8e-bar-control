@@ -92,9 +92,6 @@ export default function ProductLotsPage() {
               const product = products.find((p) => p.id === lot.productId);
               const hrs = hoursUntil(lot.expiresAt, now);
               const canUseUp = lot.status === 'active' || lot.status === 'near_expiry';
-              // เห็นรูปภาพได้เฉพาะคนที่บันทึกล็อตนั้นเอง หรือ owner/manager ที่เห็นได้ทุกล็อต
-              const canSeePhoto =
-                !!employee && (employee.id === lot.producedBy || employee.role === 'owner' || employee.role === 'manager');
               return (
                 <div key={lot.id} className="rounded-2xl bg-white p-4 shadow-card">
                   <div className="flex items-start justify-between gap-3">
@@ -107,7 +104,7 @@ export default function ProductLotsPage() {
                       </p>
                     </div>
                     <div className="flex shrink-0 items-start gap-2">
-                      {lot.photoUrl && canSeePhoto && (
+                      {lot.photoUrl && (
                         <a href={lot.photoUrl} target="_blank" rel="noopener noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img

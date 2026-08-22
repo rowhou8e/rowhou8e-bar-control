@@ -216,7 +216,7 @@ export default function PurchaseOrderDetailPage() {
             ) : (
               <p className="shrink-0 font-bold text-gray-700">{(it.quantity * it.unitPrice).toLocaleString()} บาท</p>
             )}
-            {po.status === 'draft' && canManage && (
+            {po.status === 'draft' && (
               <button
                 type="button"
                 onClick={() => handleRemoveItem(it.id)}

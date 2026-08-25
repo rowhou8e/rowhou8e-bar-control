@@ -147,6 +147,18 @@ function NewChecklistForm() {
                 ))}
               </div>
 
+              {item.status === 'normal' && (
+                <div className="mt-3">
+                  <PhotoAttach
+                    value={item.photoUrl}
+                    onChange={(url) => updateItem(idx, { photoUrl: url })}
+                    bucket="checklist-photos"
+                    employeeId={employee?.id ?? ''}
+                    label="แนบรูปเก็บประวัติ (ไม่บังคับ)"
+                  />
+                </div>
+              )}
+
               {item.status !== 'normal' && (
                 <div className="mt-3 space-y-2">
                   {risky && (

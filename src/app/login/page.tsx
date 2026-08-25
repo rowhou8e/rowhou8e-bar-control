@@ -58,9 +58,7 @@ function LiveLoginForm() {
   return (
     <div className="mx-auto flex min-h-screen max-w-app flex-col bg-white px-6 pb-10 pt-16">
       <div className="mb-10 flex flex-col items-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-bold text-white">
-          P
-        </div>
+        <img src="/logo.png" alt="Rowhouse" className="h-16 w-16 rounded-2xl object-cover" />
         <h1 className="mt-4 text-xl font-bold text-gray-900">Rowhou8e Bar Control</h1>
         <p className="mt-1 text-sm text-gray-500">เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน</p>
       </div>
@@ -195,9 +193,7 @@ function MockPinLogin({ employees }: { employees: Employee[] }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-app flex-col bg-white px-6 pb-10 pt-16">
       <div className="mb-10 flex flex-col items-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-bold text-white">
-          P
-        </div>
+        <img src="/logo.png" alt="Rowhouse" className="h-16 w-16 rounded-2xl object-cover" />
         <h1 className="mt-4 text-xl font-bold text-gray-900">Rowhou8e Bar Control</h1>
         <p className="mt-1 text-sm text-gray-500">เลือกชื่อของคุณเพื่อเข้าสู่ระบบ</p>
       </div>

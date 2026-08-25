@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
-import { PrimaryButton, SectionTitle } from '@/components/ui';
+import { PhotoAttach, PrimaryButton, SectionTitle } from '@/components/ui';
 import { getDataMode } from '@/lib/supabase/client';
 import { formatThaiDate, formatThaiDateTime, roleLabel } from '@/lib/derive';
 import type { ChecklistItemFrequency, ChecklistTemplateItem, Product, Role, Station, StockCategory, StockItem, StoreHoliday, Supplier, SupplierItemPrice } from '@/lib/types';
@@ -320,6 +320,15 @@ export default function SettingsPage() {
                         </button>
                       </div>
                     )}
+                    <div className="mt-2">
+                      <PhotoAttach
+                        value={emp.avatarUrl}
+                        onChange={(url) => employee && store.updateEmployee(emp.id, { avatarUrl: url }, employee.id)}
+                        bucket="employee-photos"
+                        employeeId={emp.id}
+                        label="รูปพนักงาน"
+                      />
+                    </div>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-[11px] text-gray-400">{emp.active ? 'ใช้งานอยู่' : 'ระงับการใช้งาน'}</p>

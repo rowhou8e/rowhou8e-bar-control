@@ -352,3 +352,18 @@ create policy "order_reminders_delete_all"
 -- create policy "photos_public_read" on storage.objects for select using (bucket_id in ('checklist-photos','production-photos','purchase-photos'));
 -- create policy "photos_authenticated_upload" on storage.objects for insert
 --   with check (bucket_id in ('checklist-photos','production-photos','purchase-photos') and auth.role() = 'authenticated');
+
+
+-- ========================================================================
+-- EMPLOYEE PROFILE PHOTOS (avatar_url) — รันใน SQL editor
+-- ========================================================================
+
+-- alter table public.employees add column if not exists avatar_url text;
+
+-- insert into storage.buckets (id, name, public) values
+--   ('employee-photos', 'employee-photos', true)
+-- on conflict (id) do nothing;
+
+-- create policy "employee_photos_public_read" on storage.objects for select using (bucket_id = 'employee-photos');
+-- create policy "employee_photos_authenticated_upload" on storage.objects for insert
+--   with check (bucket_id = 'employee-photos' and auth.role() = 'authenticated');

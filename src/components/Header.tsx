@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { store } from '@/lib/store';
+import { PhotoAttach } from '@/components/ui';
 import { getDataMode } from '@/lib/supabase/client';
 import { roleLabel } from '@/lib/derive';
 import type { Employee } from '@/lib/types';
@@ -53,10 +54,15 @@ export function Header({
         <div className="relative">
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
-            style={{ backgroundColor: currentEmployee.avatarColor }}
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
+            style={currentEmployee.avatarUrl ? undefined : { backgroundColor: currentEmployee.avatarColor }}
           >
-            {currentEmployee.nickname.slice(0, 2)}
+            {currentEmployee.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={currentEmployee.avatarUrl} alt={currentEmployee.nickname} className="h-full w-full object-cover" />
+            ) : (
+              currentEmployee.nickname.slice(0, 2)
+            )}
           </button>
           {menuOpen && (
             <>
@@ -65,6 +71,16 @@ export function Header({
                 <div className="px-2 py-1.5">
                   <p className="truncate text-sm font-semibold text-gray-900">{currentEmployee.name}</p>
                   <p className="text-xs text-gray-500">{roleLabel(currentEmployee.role)}</p>
+                </div>
+                <div className="my-1 h-px bg-gray-100" />
+                <div className="px-2 py-1.5">
+                  <PhotoAttach
+                    value={currentEmployee.avatarUrl}
+                    onChange={(url) => store.updateEmployee(currentEmployee.id, { avatarUrl: url }, currentEmployee.id)}
+                    bucket="employee-photos"
+                    employeeId={currentEmployee.id}
+                    label="รูปโปรไฟล์"
+                  />
                 </div>
                 <div className="my-1 h-px bg-gray-100" />
                 {pinMode ? (

@@ -495,6 +495,7 @@ class Store {
         nickname: input.nickname,
         role: input.role,
         avatarColor: palette[s.employees.length % palette.length],
+        avatarUrl: null,
         pinCode: input.pinCode,
         stationId: input.stationId,
         stationIds: input.stationIds ?? [],
@@ -510,7 +511,7 @@ class Store {
 
   /** pinCode ใช้ได้เฉพาะโหมด mock — เปลี่ยน PIN ของตัวเอง หรือ owner รีเซ็ต PIN ให้พนักงานคนอื่น
    *  name/nickname เปลี่ยนได้เฉพาะเจ้าของร้านเท่านั้น (จำกัดสิทธิ์ที่หน้าจอ) */
-  updateEmployee(id: string, patch: Partial<Pick<Employee, 'role' | 'active' | 'stationId' | 'stationIds' | 'pinCode' | 'name' | 'nickname'>>, actorId: string) {
+  updateEmployee(id: string, patch: Partial<Pick<Employee, 'role' | 'active' | 'stationId' | 'stationIds' | 'pinCode' | 'name' | 'nickname' | 'avatarUrl'>>, actorId: string) {
     this.update((s) => {
       const emp = s.employees.find((e) => e.id === id);
       const employees = s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e));

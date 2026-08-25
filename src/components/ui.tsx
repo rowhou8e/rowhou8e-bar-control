@@ -40,7 +40,7 @@ export function PhotoAttach({
   value: string | null;
   onChange: (url: string | null) => void;
   label?: string;
-  bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos';
+  bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos' | 'employee-photos';
   employeeId: string;
 }) {
   const [uploading, setUploading] = useState(false);

@@ -132,6 +132,7 @@ export async function fetchEmployees(): Promise<Employee[]> {
     nickname: r.nickname,
     role: r.role,
     avatarColor: r.avatar_color,
+    avatarUrl: r.avatar_url ?? null,
     pinCode: '', // โหมด Supabase ใช้ Supabase Auth ล็อกอินจริง ไม่ใช้ PIN
     stationId: r.station_id,
     stationIds: stationIdsMap.get(r.id) ?? [],
@@ -156,6 +157,7 @@ export async function fetchEmployeeByAuthUserId(authUserId: string): Promise<Emp
     nickname: data.nickname,
     role: data.role,
     avatarColor: data.avatar_color,
+    avatarUrl: data.avatar_url ?? null,
     pinCode: '',
     stationId: data.station_id,
     stationIds: (esRows ?? []).map((row: any) => row.station_id),
@@ -1632,7 +1634,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 // ================= EMPLOYEES (แก้ไข) =================
 export async function updateEmployee(
   id: string,
-  patch: { role?: string; active?: boolean; stationId?: string | null; stationIds?: string[]; name?: string; nickname?: string },
+  patch: { role?: string; active?: boolean; stationId?: string | null; stationIds?: string[]; name?: string; nickname?: string; avatarUrl?: string | null },
   actorId: string
 ) {
   const sb = getSupabaseClient();
@@ -1644,6 +1646,7 @@ export async function updateEmployee(
   if (patch.stationId !== undefined) dbPatch.station_id = patch.stationId;
   if (patch.name !== undefined) dbPatch.name = patch.name;
   if (patch.nickname !== undefined) dbPatch.nickname = patch.nickname;
+  if (patch.avatarUrl !== undefined) dbPatch.avatar_url = patch.avatarUrl;
 
   const { error } = await sb.from('employees').update(dbPatch).eq('id', id);
   if (error) throw error;
@@ -1702,7 +1705,7 @@ export async function fetchHistoryLogs(filters?: { actorId?: string; actionType?
  * ตัวอย่างการอัปโหลดรูปภาพขึ้น Supabase Storage
  * ใช้แทนการเก็บ data URL แบบใน mock store
  */
-export async function uploadPhoto(bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos', file: File, employeeId: string) {
+export async function uploadPhoto(bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos' | 'employee-photos', file: File, employeeId: string) {
   const sb = getSupabaseClient();
   const path = `${employeeId}/${Date.now()}-${file.name}`;
   const { error } = await sb.storage.from(bucket).upload(path, file);

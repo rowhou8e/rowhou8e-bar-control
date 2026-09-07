@@ -10,6 +10,7 @@ import { formatThaiDate, toDateStr } from '@/lib/derive';
 import {
   WEEKDAY_SHORT,
   approximateBuddhistHolyDays,
+  isVerifiedHolyDayYear,
   buildMonthGrid,
   effectiveStatus,
   employeesOffOnDate,
@@ -37,6 +38,12 @@ export default function SchedulePage() {
 
   async function handleAutoFillSpecialDays() {
     if (!employee) return;
+    if (!isVerifiedHolyDayYear(year)) {
+      const confirmed = window.confirm(
+        `วันพระของปี ${year} ยังไม่ได้ตรวจสอบกับปฏิทินจันทรคติไทยจริง (เป็นการคำนวณโดยประมาณทางดาราศาสตร์ ซึ่งอาจคลาดเคลื่อนได้ทั้งปีถ้าปีนี้มีเดือนแปดสองหน)\n\nต้องการเติมวันสำคัญต่อหรือไม่? แนะนำให้ตรวจสอบวันพระกับปฏิทินจริงอีกครั้งหลังเติมแล้ว`
+      );
+      if (!confirmed) return;
+    }
     setFillingSpecialDays(true);
     try {
       const holidays = fixedThaiPublicHolidays(year).map((h) => ({ date: h.date, dayType: 'วันหยุดราชการ' as const, label: h.label }));

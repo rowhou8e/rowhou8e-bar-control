@@ -198,6 +198,11 @@ function approximateBuddhistHolyDaysAstro(year: number): { date: string; label: 
   return results.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** ตรวจว่าปีนี้มีข้อมูลวันพระที่ตรวจสอบแล้วจริงหรือไม่ — ใช้เตือนก่อนเติมวันสำคัญอัตโนมัติเพื่อเตือนเจ้าของร้านว่าควรตรวจซ้ำก่อน */
+export function isVerifiedHolyDayYear(year: number): boolean {
+  return year in VERIFIED_HOLY_DAYS;
+}
+
 /** วันพระของปีที่ระบุ — ใช้ข้อมูลที่ตรวจสอบแล้วถ้ามี ไม่งั้น fallback ไปสูตรดาราศาสตร์โดยประมาณ (ดูคำเตือนด้านบน) */
 export function approximateBuddhistHolyDays(year: number): { date: string; label: string }[] {
   const verified = VERIFIED_HOLY_DAYS[year];

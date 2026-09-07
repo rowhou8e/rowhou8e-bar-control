@@ -91,6 +91,21 @@ export function EditDayModal({
           } else if (eff.source === 'exception') {
             await store.clearCalendarDay(emp.id, dateStr, currentEmployee.id);
           }
+
+          // ถ้าวันนี้หยุดประจำตาม pattern อยู่แล้ว การล้างข้อยกเว้น/ยกเลิกสลับกะข้างบนจะทำให้กลับไป
+          // เป็น "หยุด" ตาม pattern เหมือนเดิม (ไม่ใช่ "ทำงาน" ตามที่ตั้งใจ) — ต้องสร้างข้อยกเว้นระบุ
+          // "ทำงาน" ชัดเจนสำหรับวันนี้แทน เพื่อให้ค่าที่เจ้าของ/ผู้จัดการตั้งไว้มีผลจริง
+          const patternEntry = weeklyPatterns.find((p) => p.employeeId === emp.id && p.weekday === weekday);
+          if (patternEntry?.isDayOff) {
+            await store.setCalendarDay({
+              employeeId: emp.id,
+              date: dateStr,
+              status: 'work',
+              reasonType: null,
+              note: '',
+              actorId: currentEmployee.id,
+            });
+          }
           continue;
         }
 

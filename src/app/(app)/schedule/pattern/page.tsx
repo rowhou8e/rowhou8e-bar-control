@@ -121,7 +121,7 @@ export default function WeeklyPatternSettingsPage() {
       </main>
 
       {canManage && (
-        <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-app border-t border-gray-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+        <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-app border-t border-gray-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
           <button
             type="button"
             disabled={saving}

@@ -60,8 +60,8 @@ export default function SchedulePrintPage() {
       <main style={{ padding: '0 16px 24px' }}>
         <div
           style={{
-            width: '1123px',
-            maxWidth: '100%',
+            width: '100%',
+            maxWidth: '1123px',
             margin: '0 auto',
             background: '#ffffff',
             padding: '28px 32px 20px',
@@ -220,6 +220,12 @@ export default function SchedulePrintPage() {
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 10mm; }
+          .no-print { display: none !important; }
+          html, body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
+          }
         }
       `}</style>
     </div>

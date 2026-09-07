@@ -28,9 +28,13 @@ import {
   stations as initialStations,
   stockCategories as initialStockCategories,
   stockItems as initialStockItems,
+  specialDays as initialSpecialDays,
   storeHolidays as initialStoreHolidays,
   suppliers as initialSuppliers,
   supplierItemPrices as initialSupplierItemPrices,
+  weeklyPatterns as initialWeeklyPatterns,
+  workCalendarEntries as initialWorkCalendarEntries,
+  workCalendarHistory as initialWorkCalendarHistory,
   TODAY_STR,
 } from './mock-data';
 import { computeProductLotStatus, computeStockStatus } from './derive';
@@ -59,6 +63,8 @@ import type {
   PurchaseOrderStatus,
   PurchaseRequest,
   PurchaseRequestStatus,
+  SpecialDay,
+  SpecialDayType,
   Role,
   Station,
   StockCategory,
@@ -66,13 +72,20 @@ import type {
   StoreHoliday,
   Supplier,
   SupplierItemPrice,
+  Weekday,
+  WeeklyPatternEntry,
+  WorkCalendarEntry,
+  WorkCalendarHistoryEntry,
+  WorkCalendarReasonType,
+  WorkCalendarStatus,
 } from './types';
 
 // v6: เพิ่ม storeHolidays + Employee.lastLoginAt/lastLoginDevice (เฟส 4) — เปลี่ยนเวอร์ชันคีย์เพื่อไม่ให้
 // localStorage เก่าที่ยังไม่มีฟิลด์นี้ทำให้แอปพัง
 // v7: เพิ่ม orderReminders (แจ้งเตือนให้แผนกสั่งสินค้า — เฟส 5)
 // v8: เพิ่ม orderDraftPicks (ติ๊กเลือกสินค้าแบบเรียลไทม์ที่หน้า "สั่งสินค้า")
-const STORAGE_KEY = 'rowhou8e-bar-control-state-v8';
+// v9: เพิ่ม weeklyPatterns/workCalendarEntries/workCalendarHistory/specialDays (ปฏิทินการทำงาน — เฟส 5)
+const STORAGE_KEY = 'rowhou8e-bar-control-state-v9';
 
 function loadInitialState(): AppState {
   return {
@@ -92,6 +105,10 @@ function loadInitialState(): AppState {
     storeHolidays: initialStoreHolidays,
     orderReminders: initialOrderReminders,
     orderDraftPicks: [],
+    weeklyPatterns: initialWeeklyPatterns,
+    workCalendarEntries: initialWorkCalendarEntries,
+    workCalendarHistory: initialWorkCalendarHistory,
+    specialDays: initialSpecialDays,
     historyLogs: initialHistoryLogs,
     settings: initialSettings,
     session: null,
@@ -1164,6 +1181,225 @@ class Store {
       ...s,
       orderDraftPicks: s.orderDraftPicks.filter((p) => !(p.stockItemId === stockItemId && p.employeeId === employeeId)),
     }));
+  }
+
+  // ================= ปฏิทินการทำงาน (Work Schedule Calendar) — เฟส 5 =================
+  /** ตั้ง/แก้รูปแบบวันหยุดประจำสัปดาห์ของพนักงานคนหนึ่ง — แทนที่ทุกวันที่ส่งมาในครั้งเดียว (upsert ทีละคน) */
+  setWeeklyPattern(employeeId: string, days: { weekday: Weekday; isDayOff: boolean }[], actorId: string) {
+    this.update((s) => {
+      const others = s.weeklyPatterns.filter((w) => w.employeeId !== employeeId || !days.some((d) => d.weekday === w.weekday));
+      const now = new Date().toISOString();
+      const updated: WeeklyPatternEntry[] = days.map((d) => {
+        const existing = s.weeklyPatterns.find((w) => w.employeeId === employeeId && w.weekday === d.weekday);
+        return {
+          id: existing?.id ?? nextId('wpat'),
+          employeeId,
+          weekday: d.weekday,
+          isDayOff: d.isDayOff,
+          updatedBy: actorId,
+          updatedAt: now,
+        };
+      });
+      const employee = s.employees.find((e) => e.id === employeeId);
+      this.log('calendar_change', actorId, employee?.nickname ?? employeeId, 'แก้ไขรูปแบบวันหยุดประจำสัปดาห์');
+      return { ...s, weeklyPatterns: [...others, ...updated] };
+    });
+  }
+
+  /** บันทึกข้อยกเว้นเฉพาะวัน (ลา/สลับกะ/อื่นๆ) — มีผลเหนือกว่า pattern ประจำสัปดาห์เสมอ */
+  setCalendarDay(input: {
+    employeeId: string;
+    date: string;
+    status: WorkCalendarStatus;
+    reasonType: WorkCalendarReasonType | null;
+    note: string;
+    actorId: string;
+  }) {
+    this.update((s) => {
+      const existing = s.workCalendarEntries.find((e) => e.employeeId === input.employeeId && e.date === input.date);
+      const now = new Date().toISOString();
+      const entry: WorkCalendarEntry = {
+        id: existing?.id ?? nextId('wcal'),
+        employeeId: input.employeeId,
+        date: input.date,
+        status: input.status,
+        reasonType: input.reasonType,
+        note: input.note,
+        swapPairId: existing?.swapPairId ?? null,
+        updatedBy: input.actorId,
+        updatedAt: now,
+      };
+      const history: WorkCalendarHistoryEntry = {
+        id: nextId('wcalh'),
+        date: input.date,
+        employeeId: input.employeeId,
+        oldStatus: existing?.status ?? null,
+        newStatus: input.status,
+        reasonType: input.reasonType,
+        note: input.note,
+        changedBy: input.actorId,
+        changedAt: now,
+      };
+      const employee = s.employees.find((e) => e.id === input.employeeId);
+      this.log('calendar_change', input.actorId, employee?.nickname ?? input.employeeId, `${input.date}: ${input.status === 'off' ? 'หยุด' : 'ทำงาน'}${input.reasonType ? ` (${input.reasonType})` : ''}`);
+      return {
+        ...s,
+        workCalendarEntries: existing
+          ? s.workCalendarEntries.map((e) => (e.id === existing.id ? entry : e))
+          : [...s.workCalendarEntries, entry],
+        workCalendarHistory: [history, ...s.workCalendarHistory],
+      };
+    });
+  }
+
+  /** ลบข้อยกเว้นของวันนั้นออก — กลับไปใช้ค่าเริ่มต้นจากวันหยุดประจำสัปดาห์แทน */
+  clearCalendarDay(employeeId: string, date: string, actorId: string) {
+    this.update((s) => {
+      const existing = s.workCalendarEntries.find((e) => e.employeeId === employeeId && e.date === date);
+      if (!existing) return s;
+      const history: WorkCalendarHistoryEntry = {
+        id: nextId('wcalh'),
+        date,
+        employeeId,
+        oldStatus: existing.status,
+        newStatus: 'work',
+        reasonType: null,
+        note: 'ยกเลิกการแก้ไข — กลับไปใช้ค่าเริ่มต้นจาก pattern',
+        changedBy: actorId,
+        changedAt: new Date().toISOString(),
+      };
+      const employee = s.employees.find((e) => e.id === employeeId);
+      this.log('calendar_change', actorId, employee?.nickname ?? employeeId, `${date}: ยกเลิกข้อยกเว้น กลับไปใช้ pattern`);
+      return {
+        ...s,
+        workCalendarEntries: s.workCalendarEntries.filter((e) => e.id !== existing.id),
+        workCalendarHistory: [history, ...s.workCalendarHistory],
+      };
+    });
+  }
+
+  /** บันทึกคู่สลับกะ (A ↔ B) — สร้างข้อยกเว้น 2 แถวพร้อมกัน ผูกด้วย swapPairId เดียวกัน */
+  createCalendarSwap(input: {
+    employeeAId: string;
+    dateA: string;
+    statusA: WorkCalendarStatus;
+    employeeBId: string;
+    dateB: string;
+    statusB: WorkCalendarStatus;
+    note: string;
+    actorId: string;
+  }) {
+    this.update((s) => {
+      const swapPairId = nextId('swap');
+      const now = new Date().toISOString();
+      const makeEntry = (employeeId: string, date: string, status: WorkCalendarStatus): WorkCalendarEntry => {
+        const existing = s.workCalendarEntries.find((e) => e.employeeId === employeeId && e.date === date);
+        return {
+          id: existing?.id ?? nextId('wcal'),
+          employeeId,
+          date,
+          status,
+          reasonType: 'สลับกะ',
+          note: input.note,
+          swapPairId,
+          updatedBy: input.actorId,
+          updatedAt: now,
+        };
+      };
+      const entryA = makeEntry(input.employeeAId, input.dateA, input.statusA);
+      const entryB = makeEntry(input.employeeBId, input.dateB, input.statusB);
+      const upsert = (list: WorkCalendarEntry[], entry: WorkCalendarEntry) =>
+        list.some((e) => e.employeeId === entry.employeeId && e.date === entry.date)
+          ? list.map((e) => (e.employeeId === entry.employeeId && e.date === entry.date ? entry : e))
+          : [...list, entry];
+      const nextEntries = upsert(upsert(s.workCalendarEntries, entryA), entryB);
+      const makeHistory = (entry: WorkCalendarEntry): WorkCalendarHistoryEntry => ({
+        id: nextId('wcalh'),
+        date: entry.date,
+        employeeId: entry.employeeId,
+        oldStatus: null,
+        newStatus: entry.status,
+        reasonType: entry.reasonType,
+        note: entry.note,
+        changedBy: input.actorId,
+        changedAt: now,
+      });
+      this.log('calendar_change', input.actorId, 'สลับกะ', `สลับกะ: ${input.dateA} ↔ ${input.dateB}`);
+      return {
+        ...s,
+        workCalendarEntries: nextEntries,
+        workCalendarHistory: [makeHistory(entryA), makeHistory(entryB), ...s.workCalendarHistory],
+      };
+    });
+  }
+
+  /** ยกเลิกคู่สลับกะ — ลบทั้ง 2 แถวที่ผูกกันด้วย swapPairId นี้ */
+  removeCalendarSwap(swapPairId: string, actorId: string) {
+    this.update((s) => {
+      const pair = s.workCalendarEntries.filter((e) => e.swapPairId === swapPairId);
+      if (pair.length === 0) return s;
+      const now = new Date().toISOString();
+      const histories: WorkCalendarHistoryEntry[] = pair.map((entry) => ({
+        id: nextId('wcalh'),
+        date: entry.date,
+        employeeId: entry.employeeId,
+        oldStatus: entry.status,
+        newStatus: 'work',
+        reasonType: null,
+        note: 'ยกเลิกคู่สลับกะ',
+        changedBy: actorId,
+        changedAt: now,
+      }));
+      this.log('calendar_change', actorId, 'สลับกะ', 'ยกเลิกคู่สลับกะ');
+      return {
+        ...s,
+        workCalendarEntries: s.workCalendarEntries.filter((e) => e.swapPairId !== swapPairId),
+        workCalendarHistory: [...histories, ...s.workCalendarHistory],
+      };
+    });
+  }
+
+  // ================= วันพระ/วันสำคัญ/วันหยุดราชการ — เฟส 5 =================
+  addSpecialDay(input: { date: string; dayType: SpecialDayType; label: string; actorId: string }) {
+    this.update((s) => {
+      if (s.specialDays.some((d) => d.date === input.date && d.dayType === input.dayType && d.label === input.label)) return s;
+      const day: SpecialDay = {
+        id: nextId('sday'),
+        date: input.date,
+        dayType: input.dayType,
+        label: input.label,
+        source: 'manual',
+        fetchedAt: new Date().toISOString(),
+      };
+      this.log('calendar_change', input.actorId, input.dayType, `เพิ่ม${input.dayType} · ${input.date}${input.label ? `: ${input.label}` : ''}`);
+      return { ...s, specialDays: [...s.specialDays, day].sort((a, b) => a.date.localeCompare(b.date)) };
+    });
+  }
+
+  removeSpecialDay(id: string, actorId: string) {
+    this.update((s) => {
+      const day = s.specialDays.find((d) => d.id === id);
+      if (!day) return s;
+      this.log('calendar_change', actorId, day.dayType, `ลบ${day.dayType} · ${day.date}`);
+      return { ...s, specialDays: s.specialDays.filter((d) => d.id !== id) };
+    });
+  }
+
+  /** เพิ่มหลายรายการพร้อมกัน (ใช้ตอนเชื่อม AI ดึงวันพระ/วันสำคัญ/วันหยุดราชการมาเติมทีเดียว) — กันรายการซ้ำ */
+  bulkAddSpecialDays(days: { date: string; dayType: SpecialDayType; label: string }[], actorId: string) {
+    this.update((s) => {
+      const now = new Date().toISOString();
+      const additions: SpecialDay[] = [];
+      for (const d of days) {
+        const dup = s.specialDays.some((x) => x.date === d.date && x.dayType === d.dayType && x.label === d.label)
+          || additions.some((x) => x.date === d.date && x.dayType === d.dayType && x.label === d.label);
+        if (dup) continue;
+        additions.push({ id: nextId('sday'), date: d.date, dayType: d.dayType, label: d.label, source: 'ai', fetchedAt: now });
+      }
+      if (additions.length === 0) return s;
+      this.log('calendar_change', actorId, 'วันสำคัญ (AI)', `เพิ่ม ${additions.length} รายการจาก AI`);
+      return { ...s, specialDays: [...s.specialDays, ...additions].sort((a, b) => a.date.localeCompare(b.date)) };
+    });
   }
 }
 

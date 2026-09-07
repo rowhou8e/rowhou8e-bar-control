@@ -24,9 +24,13 @@ import type {
   Station,
   StockCategory,
   StockItem,
+  SpecialDay,
   StoreHoliday,
   Supplier,
   SupplierItemPrice,
+  WeeklyPatternEntry,
+  WorkCalendarEntry,
+  WorkCalendarHistoryEntry,
 } from './types';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -1022,3 +1026,31 @@ export const appSettings: AppSettings = {
   closingTime: '20:00',
   closingSummaryEnabled: true,
 };
+
+// ===================== ปฏิทินการทำงาน (Work Schedule Calendar) — เฟส 5 =====================
+// รูปแบบวันหยุดประจำสัปดาห์ (ค่าเริ่มต้นต่อพนักงาน) — ตัวอย่าง: พนักงานส่วนใหญ่หยุดวันเดิมทุกสัปดาห์
+export const weeklyPatterns: WeeklyPatternEntry[] = [
+  { id: 'wpat-001', employeeId: 'emp-staff-1', weekday: 1, isDayOff: true, updatedBy: 'emp-owner-1', updatedAt: addDays(NOW, -60).toISOString() },
+  { id: 'wpat-002', employeeId: 'emp-staff-2', weekday: 3, isDayOff: true, updatedBy: 'emp-owner-1', updatedAt: addDays(NOW, -60).toISOString() },
+  { id: 'wpat-003', employeeId: 'emp-staff-3', weekday: 2, isDayOff: true, updatedBy: 'emp-owner-1', updatedAt: addDays(NOW, -60).toISOString() },
+  { id: 'wpat-004', employeeId: 'emp-manager-1', weekday: 0, isDayOff: true, updatedBy: 'emp-owner-1', updatedAt: addDays(NOW, -60).toISOString() },
+];
+// ข้อยกเว้นเฉพาะวัน (ลา/สลับกะ/อื่นๆ) — มีผลเหนือกว่า pattern ประจำสัปดาห์เสมอ — ตัวอย่างใกล้วันนี้
+export const workCalendarEntries: WorkCalendarEntry[] = [
+  { id: 'wcal-001', employeeId: 'emp-staff-1', date: toDateStr(addDays(NOW, 3)), status: 'off', reasonType: 'ลา', note: 'ลาป่วย', swapPairId: null, updatedBy: 'emp-staff-1', updatedAt: addHours(NOW, -6).toISOString() },
+  { id: 'wcal-002', employeeId: 'emp-staff-2', date: toDateStr(addDays(NOW, 5)), status: 'off', reasonType: 'สลับกะ', note: 'สลับกะกับวิภา', swapPairId: 'swap-001', updatedBy: 'emp-staff-2', updatedAt: addHours(NOW, -3).toISOString() },
+  { id: 'wcal-003', employeeId: 'emp-staff-3', date: toDateStr(addDays(NOW, 5)), status: 'work', reasonType: 'สลับกะ', note: 'รับกะแทนสมชาย', swapPairId: 'swap-001', updatedBy: 'emp-staff-2', updatedAt: addHours(NOW, -3).toISOString() },
+];
+
+// ประวัติการแก้ไขปฏิทิน (append-only) — คู่กับ 2 รายการด้านบน
+export const workCalendarHistory: WorkCalendarHistoryEntry[] = [
+  { id: 'wcalh-001', date: toDateStr(addDays(NOW, 3)), employeeId: 'emp-staff-1', oldStatus: null, newStatus: 'off', reasonType: 'ลา', note: 'ลาป่วย', changedBy: 'emp-staff-1', changedAt: addHours(NOW, -6).toISOString() },
+  { id: 'wcalh-002', date: toDateStr(addDays(NOW, 5)), employeeId: 'emp-staff-2', oldStatus: null, newStatus: 'off', reasonType: 'สลับกะ', note: 'สลับกะกับวิภา', changedBy: 'emp-staff-2', changedAt: addHours(NOW, -3).toISOString() },
+  { id: 'wcalh-003', date: toDateStr(addDays(NOW, 5)), employeeId: 'emp-staff-3', oldStatus: null, newStatus: 'work', reasonType: 'สลับกะ', note: 'รับกะแทนสมชาย', changedBy: 'emp-staff-2', changedAt: addHours(NOW, -3).toISOString() },
+];
+
+// วันพระ/วันสำคัญ/วันหยุดราชการ (ข้อมูลอ้างอิงบนปฏิทิน — ตัวอย่างกรอกเอง รอเชื่อม AI ในเฟสถัดไป)
+export const specialDays: SpecialDay[] = [
+  { id: 'sday-001', date: toDateStr(addDays(NOW, 2)), dayType: 'วันพระ', label: '', source: 'manual', fetchedAt: addDays(NOW, -1).toISOString() },
+  { id: 'sday-002', date: toDateStr(addDays(NOW, 9)), dayType: 'วันพระ', label: '', source: 'manual', fetchedAt: addDays(NOW, -1).toISOString() },
+];

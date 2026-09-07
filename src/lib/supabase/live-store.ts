@@ -17,7 +17,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseClient } from './client';
 import * as q from './queries';
 import { detectDeviceLabel } from '../device';
-import type { AppSettings, AppState, ChecklistEntryItem, ChecklistItemFrequency, ProductLotStatus, PurchaseOrderStatus, PurchaseRequestStatus, Role } from '../types';
+import type { AppSettings, AppState, ChecklistEntryItem, ChecklistItemFrequency, ProductLotStatus, PurchaseOrderStatus, PurchaseRequestStatus, Role, SpecialDayType, Weekday, WorkCalendarReasonType, WorkCalendarStatus } from '../types';
 
 /** ตารางที่เปิด Postgres Changes ไว้ (ดู schema.sql ส่วน "9) REALTIME") — subscribe เพื่อให้ทุกหน้าจอ
  *  ที่เปิดค้างไว้อัปเดตสดทันทีเมื่อมีคนอื่นบันทึกข้อมูล โดยไม่ต้องรีเฟรชเอง — เฟส 4
@@ -29,6 +29,7 @@ const REALTIME_TABLES = [
   'products', 'product_lots', 'purchase_requests', 'suppliers',
   'supplier_item_prices', 'purchase_orders', 'purchase_order_items',
   'store_holidays', 'order_reminders', 'order_draft_picks', 'history_logs', 'app_settings',
+  'employee_weekly_pattern', 'work_calendar_entries', 'work_calendar_history', 'special_days',
 ];
 
 /** ตาราง -> ชื่อ resource ที่ต้องรีเฟรช ใช้ทั้งตอน realtime event จากคนอื่น (setupRealtime/scheduleRefetch)
@@ -54,6 +55,10 @@ const TABLE_RESOURCE: Record<string, string> = {
   history_logs: 'historyLogs',
   app_settings: 'settings',
   cash_reports: 'cashReports',
+  employee_weekly_pattern: 'weeklyPatterns',
+  work_calendar_entries: 'workCalendarEntries',
+  work_calendar_history: 'workCalendarHistory',
+  special_days: 'specialDays',
 };
 
 function todayStr(): string {
@@ -89,6 +94,10 @@ function emptyState(initializing: boolean): AppState {
     storeHolidays: [],
     orderReminders: [],
     orderDraftPicks: [],
+    weeklyPatterns: [],
+    workCalendarEntries: [],
+    workCalendarHistory: [],
+    specialDays: [],
     historyLogs: [],
     settings: DEFAULT_SETTINGS,
     session: null,
@@ -184,6 +193,10 @@ export class LiveStore {
         storeHolidays,
         orderReminders,
         orderDraftPicks,
+        weeklyPatterns,
+        workCalendarEntries,
+        workCalendarHistory,
+        specialDays,
         settings,
         historyLogs,
       ] = await Promise.all([
@@ -203,6 +216,10 @@ export class LiveStore {
         q.fetchStoreHolidays(),
         q.fetchOrderReminders(),
         q.fetchOrderDraftPicks(),
+        q.fetchWeeklyPatterns(),
+        q.fetchWorkCalendarEntries(),
+        q.fetchWorkCalendarHistory(),
+        q.fetchSpecialDays(),
         q.fetchSettings(),
         q.fetchHistoryLogs(),
       ]);
@@ -224,6 +241,10 @@ export class LiveStore {
         storeHolidays,
         orderReminders,
         orderDraftPicks,
+        weeklyPatterns,
+        workCalendarEntries,
+        workCalendarHistory,
+        specialDays,
         historyLogs,
         settings,
         session: { employeeId: employee.id, loggedInAt: new Date().toISOString() },
@@ -361,6 +382,30 @@ export class LiveStore {
     this.notify();
   }
 
+  private async refetchWeeklyPatterns() {
+    const weeklyPatterns = await q.fetchWeeklyPatterns();
+    this.state = { ...this.state, weeklyPatterns };
+    this.notify();
+  }
+
+  private async refetchWorkCalendarEntries() {
+    const workCalendarEntries = await q.fetchWorkCalendarEntries();
+    this.state = { ...this.state, workCalendarEntries };
+    this.notify();
+  }
+
+  private async refetchWorkCalendarHistory() {
+    const workCalendarHistory = await q.fetchWorkCalendarHistory();
+    this.state = { ...this.state, workCalendarHistory };
+    this.notify();
+  }
+
+  private async refetchSpecialDays() {
+    const specialDays = await q.fetchSpecialDays();
+    this.state = { ...this.state, specialDays };
+    this.notify();
+  }
+
   private async refetchSettings() {
     const settings = await q.fetchSettings();
     this.state = { ...this.state, settings };
@@ -391,6 +436,10 @@ export class LiveStore {
       case 'storeHolidays': return this.refetchStoreHolidays();
       case 'orderReminders': return this.refetchOrderReminders();
       case 'orderDraftPicks': return this.refetchOrderDraftPicks();
+      case 'weeklyPatterns': return this.refetchWeeklyPatterns();
+      case 'workCalendarEntries': return this.refetchWorkCalendarEntries();
+      case 'workCalendarHistory': return this.refetchWorkCalendarHistory();
+      case 'specialDays': return this.refetchSpecialDays();
       case 'historyLogs': return this.refetchHistoryLogs();
       case 'settings': return this.refetchSettings();
       case 'cashReports': return this.refetchCashReports();
@@ -763,6 +812,63 @@ export class LiveStore {
   async clearOrderDraftPick(stockItemId: string, employeeId: string) {
     await q.clearOrderDraftPick(stockItemId, employeeId);
     await this.refetchOrderDraftPicks();
+  }
+
+  // ================= ปฏิทินการทำงาน (Work Schedule Calendar) — เฟส 5 =================
+  async setWeeklyPattern(employeeId: string, days: { weekday: Weekday; isDayOff: boolean }[], actorId: string) {
+    await q.setWeeklyPattern(employeeId, days, actorId);
+    await this.refetchWeeklyPatterns();
+  }
+
+  async setCalendarDay(input: {
+    employeeId: string;
+    date: string;
+    status: WorkCalendarStatus;
+    reasonType: WorkCalendarReasonType | null;
+    note: string;
+    actorId: string;
+  }) {
+    await q.setCalendarDay(input);
+    await Promise.all([this.refetchWorkCalendarEntries(), this.refetchWorkCalendarHistory()]);
+  }
+
+  async clearCalendarDay(employeeId: string, date: string, actorId: string) {
+    await q.clearCalendarDay(employeeId, date, actorId);
+    await Promise.all([this.refetchWorkCalendarEntries(), this.refetchWorkCalendarHistory()]);
+  }
+
+  async createCalendarSwap(input: {
+    employeeAId: string;
+    dateA: string;
+    statusA: WorkCalendarStatus;
+    employeeBId: string;
+    dateB: string;
+    statusB: WorkCalendarStatus;
+    note: string;
+    actorId: string;
+  }) {
+    await q.createCalendarSwap(input);
+    await Promise.all([this.refetchWorkCalendarEntries(), this.refetchWorkCalendarHistory()]);
+  }
+
+  async removeCalendarSwap(swapPairId: string, actorId: string) {
+    await q.removeCalendarSwap(swapPairId, actorId);
+    await Promise.all([this.refetchWorkCalendarEntries(), this.refetchWorkCalendarHistory()]);
+  }
+
+  async addSpecialDay(input: { date: string; dayType: SpecialDayType; label: string; actorId: string }) {
+    await q.addSpecialDay(input);
+    await this.refetchSpecialDays();
+  }
+
+  async removeSpecialDay(id: string, actorId: string) {
+    await q.removeSpecialDay(id, actorId);
+    await this.refetchSpecialDays();
+  }
+
+  async bulkAddSpecialDays(days: { date: string; dayType: SpecialDayType; label: string }[], actorId: string) {
+    await q.bulkAddSpecialDays(days, actorId);
+    await this.refetchSpecialDays();
   }
 
   // ================= วันหยุดร้าน (owner/manager เท่านั้น) — เฟส 4 =================

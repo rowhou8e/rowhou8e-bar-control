@@ -27,6 +27,7 @@ const ACTION_LABELS: Record<HistoryActionType, string> = {
     po_price_update: 'แก้ไขราคาในใบสั่งซื้อ',
     po_item_add: 'เพิ่มรายการในใบสั่งซื้อ',
     po_item_remove: 'ลบรายการในใบสั่งซื้อ',
+  calendar_change: 'แก้ไขปฏิทินการทำงาน',
 };
 
 const ACTION_ICON: Record<HistoryActionType, string> = {
@@ -49,6 +50,7 @@ const ACTION_ICON: Record<HistoryActionType, string> = {
     po_price_update: '💰',
     po_item_add: '➕',
     po_item_remove: '➖',
+  calendar_change: '📅',
 };
 
 export default function HistoryPage() {

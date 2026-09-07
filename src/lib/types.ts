@@ -295,7 +295,8 @@ export type HistoryActionType =
   | 'cash_report_submit' // บันทึกรายงานเงินสดปิดร้าน — เฟส 3
   | 'cash_report_edit' // แก้ไขรายงานเงินสดปิดร้านที่บันทึกไว้แล้ว
   | 'order_reminder_send' // เจ้าของ/ผู้จัดการส่งแจ้งเตือนให้แผนกสั่งสินค้า — เฟส 5
-  | 'order_reminder_ack'; // พนักงานในแผนกกดยืนยันรับทราบแจ้งเตือนสั่งสินค้า
+  | 'order_reminder_ack' // พนักงานในแผนกกดยืนยันรับทราบแจ้งเตือนสั่งสินค้า
+  | 'calendar_change'; // แก้ไขปฏิทินการทำงาน (วันหยุด/สลับกะ/ยกเลิก pattern) — เฟส 5
 
 export interface HistoryLog {
   id: string;
@@ -370,6 +371,68 @@ export interface OrderReminder {
   responseNote: string;
 }
 
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0=อาทิตย์ ... 6=เสาร์ (ตรงกับ JS Date.getDay())
+
+/**
+ * รูปแบบวันหยุดประจำสัปดาห์ของพนักงานแต่ละคน (ชั้นที่ 1 ของโมเดลปฏิทินการทำงาน — เฟส 5)
+ * เป็นค่าเริ่มต้น — ถ้ามีข้อยกเว้นเฉพาะวันใน WorkCalendarEntry ของวันนั้น ให้ใช้ค่าจาก WorkCalendarEntry แทน
+ */
+export interface WeeklyPatternEntry {
+  id: string;
+  employeeId: string;
+  weekday: Weekday;
+  isDayOff: boolean;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
+export type WorkCalendarStatus = 'work' | 'off';
+export type WorkCalendarReasonType = 'ลา' | 'สลับกะ' | 'อื่นๆ';
+
+/**
+ * ข้อยกเว้นเฉพาะวัน (ชั้นที่ 2 ของโมเดลปฏิทินการทำงาน — เฟส 5) — มีผลเหนือกว่า WeeklyPatternEntry เสมอ
+ * swapPairId ใช้จับคู่ "การสลับกะ" (A ↔ B) — ทั้งสองแถวที่เกี่ยวข้องเก็บค่า swapPairId เดียวกัน (อาจอยู่คนละเดือน)
+ */
+export interface WorkCalendarEntry {
+  id: string;
+  employeeId: string;
+  date: string; // YYYY-MM-DD
+  status: WorkCalendarStatus;
+  reasonType: WorkCalendarReasonType | null;
+  note: string;
+  swapPairId: string | null;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
+/**
+ * ประวัติการแก้ไขปฏิทินการทำงาน (append-only ห้ามแก้ไข/ลบ) — ตอบ "ใครเปลี่ยนวันหยุดใคร เมื่อไหร่" — เฟส 5
+ */
+export interface WorkCalendarHistoryEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  employeeId: string;
+  oldStatus: WorkCalendarStatus | null; // null = ก่อนหน้านี้ไม่มีข้อยกเว้น (ใช้ค่าเริ่มต้นจาก pattern)
+  newStatus: WorkCalendarStatus;
+  reasonType: WorkCalendarReasonType | null;
+  note: string;
+  changedBy: string | null;
+  changedAt: string;
+}
+
+export type SpecialDayType = 'วันพระ' | 'วันหยุดราชการ' | 'วันสำคัญ';
+export type SpecialDaySource = 'ai' | 'manual';
+
+/** วันพระ/วันสำคัญ/วันหยุดราชการ — ข้อมูลอ้างอิงแสดงบนปฏิทินการทำงาน (ไม่ผูกกับ work/off) — เฟส 5 */
+export interface SpecialDay {
+  id: string;
+  date: string; // YYYY-MM-DD
+  dayType: SpecialDayType;
+  label: string;
+  source: SpecialDaySource;
+  fetchedAt: string;
+}
+
 /**
  * รูปแบบ state กลางของทั้งแอป — ใช้ร่วมกันทั้ง mock store (src/lib/store.ts)
  * และ live store ที่ต่อฐานข้อมูลจริง (src/lib/supabase/live-store.ts)
@@ -393,6 +456,10 @@ export interface AppState {
   storeHolidays: StoreHoliday[];
   orderReminders: OrderReminder[];
   orderDraftPicks: OrderDraftPick[];
+  weeklyPatterns: WeeklyPatternEntry[];
+  workCalendarEntries: WorkCalendarEntry[];
+  workCalendarHistory: WorkCalendarHistoryEntry[];
+  specialDays: SpecialDay[];
   historyLogs: HistoryLog[];
   settings: AppSettings;
   session: CurrentUserSession | null;
@@ -626,4 +693,49 @@ export interface AppStore {
   setOrderDraftPick(stockItemId: string, quantity: number, employeeId: string): void | Promise<void>;
   /** ยกเลิกติ๊ก — ลบแถวออกทันที */
   clearOrderDraftPick(stockItemId: string, employeeId: string): void | Promise<void>;
+
+  // ================= ปฏิทินการทำงาน (Work Schedule Calendar) — เฟส 5 =================
+  // สิทธิ์แก้ไข: เจ้าของแก้ของทุกคนได้ (รวมของตัวเอง) — ผู้จัดการแก้ของทุกคนได้ ยกเว้นของเจ้าของ —
+  // พนักงานดูได้อย่างเดียว (จำกัดสิทธิ์ที่หน้าจอ + RLS ฝั่ง Supabase) ไม่เชื่อมกับการคำนวณเงินเดือน/ค่าแรง
+
+  /** ตั้ง/แก้ไขวันหยุดประจำสัปดาห์ทั้งชุดของพนักงานคนหนึ่งในครั้งเดียว (จากหน้า "ตั้งค่าวันหยุดประจำ") */
+  setWeeklyPattern(
+    employeeId: string,
+    days: { weekday: Weekday; isDayOff: boolean }[],
+    actorId: string
+  ): void | Promise<void>;
+
+  /** ตั้ง/แก้ไขข้อยกเว้นเฉพาะวันของพนักงานคนหนึ่ง (ลา/อื่นๆ หรือสลับสถานะ work/off ธรรมดา — ไม่ใช่การสลับกะ) */
+  setCalendarDay(input: {
+    employeeId: string;
+    date: string;
+    status: WorkCalendarStatus;
+    reasonType: WorkCalendarReasonType | null;
+    note: string;
+    actorId: string;
+  }): void | Promise<void>;
+  /** ล้างข้อยกเว้นของวันนั้นออก — กลับไปใช้ค่าเริ่มต้นจากวันหยุดประจำสัปดาห์แทน */
+  clearCalendarDay(employeeId: string, date: string, actorId: string): void | Promise<void>;
+
+  /**
+   * บันทึกคู่สลับกะ (A ↔ B) — สร้างข้อยกเว้น 2 แถวที่เชื่อมกันด้วย swapPairId เดียวกัน อาจอยู่คนละเดือนกันได้
+   */
+  createCalendarSwap(input: {
+    employeeAId: string;
+    dateA: string;
+    statusA: WorkCalendarStatus;
+    employeeBId: string;
+    dateB: string;
+    statusB: WorkCalendarStatus;
+    note: string;
+    actorId: string;
+  }): void | Promise<void>;
+  /** ยกเลิกคู่สลับกะ — ลบทั้ง 2 แถวที่เชื่อมกันด้วย swapPairId นี้ กลับไปใช้ค่าเริ่มต้นจาก pattern */
+  removeCalendarSwap(swapPairId: string, actorId: string): void | Promise<void>;
+
+  /** เพิ่มวันพระ/วันสำคัญ/วันหยุดราชการด้วยตนเอง (source = 'manual') */
+  addSpecialDay(input: { date: string; dayType: SpecialDayType; label: string; actorId: string }): void | Promise<void>;
+  removeSpecialDay(id: string, actorId: string): void | Promise<void>;
+  /** เพิ่มวันพระ/วันสำคัญ/วันหยุดราชการหลายรายการพร้อมกัน (source = 'ai') — ใช้ตอนดึงข้อมูลจาก AI ให้อัตโนมัติต่อเดือน */
+  bulkAddSpecialDays(days: { date: string; dayType: SpecialDayType; label: string }[], actorId: string): void | Promise<void>;
 }

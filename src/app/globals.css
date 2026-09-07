@@ -118,4 +118,8 @@ textarea::placeholder {
     padding: 0 !important;
     max-width: none !important;
   }
+  /* หน้าพิมพ์ตารางปฏิทิน (/schedule/print) ต้องกว้างเต็ม A4 แนวนอน ไม่ถูกจำกัดที่ 480px แบบหน้าจอมือถือ */
+  .max-w-app {
+    max-width: none !important;
+  }
 }

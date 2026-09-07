@@ -10,6 +10,7 @@ const navItems = [
   { href: '/checklist', label: 'เช็กลิสต์', icon: ChecklistIcon },
   { href: '/milk', label: 'ออร์เดอร์เพิ่ม', icon: MilkIcon },
   { href: '/order', label: 'สั่งสินค้า', icon: OrderIcon },
+  { href: '/schedule', label: 'ปฏิทิน', icon: ScheduleIcon },
   { href: '/notifications', label: 'แจ้งเตือน', icon: BellIcon },
 ];
 
@@ -48,7 +49,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-app border-t border-gray-100 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-nav backdrop-blur">
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-6">
         {navItems.map((item) => {
           const active = pathname?.startsWith(item.href);
           const Icon = item.icon;
@@ -109,6 +110,16 @@ function OrderIcon({ active }: { active: boolean }) {
       <path d="M6 6 5 3H2" />
       <circle cx="10" cy="20" r="1.4" fill={iconBase(active)} stroke="none" />
       <circle cx="17" cy="20" r="1.4" fill={iconBase(active)} stroke="none" />
+    </svg>
+  );
+}
+function ScheduleIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconBase(active)} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   );
 }

@@ -1,0 +1,178 @@
+import type { Employee, SpecialDay, Weekday, WorkCalendarEntry, WorkCalendarStatus, WeeklyPatternEntry } from './types';
+import { toDateStr } from './derive';
+
+export const WEEKDAY_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+export const WEEKDAY_FULL = ['วันอาทิตย์', 'วันจันทร์', 'วันอังคาร', 'วันพุธ', 'วันพฤหัสบดี', 'วันศุกร์', 'วันเสาร์'];
+
+/** ผลลัพธ์สถานะของพนักงาน 1 คนในวันที่กำหนด — รวม pattern + ข้อยกเว้นแล้ว */
+export interface EffectiveDayStatus {
+  status: WorkCalendarStatus;
+  /** exception = มีแถวใน work_calendar_entries ของวันนี้ / pattern = มาจากวันหยุดประจำสัปดาห์ / default = ไม่มีข้อมูล (ทำงานปกติ) */
+  source: 'exception' | 'pattern' | 'default';
+  entry: WorkCalendarEntry | null;
+}
+
+/** หาสถานะจริงของพนักงาน 1 คนในวันที่กำหนด: ข้อยกเว้นเฉพาะวันชนะเสมอ, รองลงมาคือวันหยุดประจำสัปดาห์, ค่าเริ่มต้นคือวันทำงาน */
+export function effectiveStatus(
+  employeeId: string,
+  dateStr: string,
+  weekday: Weekday,
+  weeklyPatterns: WeeklyPatternEntry[],
+  workCalendarEntries: WorkCalendarEntry[]
+): EffectiveDayStatus {
+  const entry = workCalendarEntries.find((e) => e.employeeId === employeeId && e.date === dateStr) ?? null;
+  if (entry) return { status: entry.status, source: 'exception', entry };
+
+  const pattern = weeklyPatterns.find((p) => p.employeeId === employeeId && p.weekday === weekday);
+  if (pattern?.isDayOff) return { status: 'off', source: 'pattern', entry: null };
+
+  return { status: 'work', source: 'default', entry: null };
+}
+
+export interface DayOffInfo {
+  employee: Employee;
+  effective: EffectiveDayStatus;
+}
+
+/** รายชื่อพนักงานทุกคนที่หยุดในวันที่กำหนด (ทั้งจาก pattern และข้อยกเว้น) */
+export function employeesOffOnDate(
+  dateStr: string,
+  weekday: Weekday,
+  employees: Employee[],
+  weeklyPatterns: WeeklyPatternEntry[],
+  workCalendarEntries: WorkCalendarEntry[]
+): DayOffInfo[] {
+  return employees
+    .map((employee) => ({ employee, effective: effectiveStatus(employee.id, dateStr, weekday, weeklyPatterns, workCalendarEntries) }))
+    .filter((x) => x.effective.status === 'off');
+}
+
+export interface MonthCell {
+  date: Date | null;
+  dateStr: string | null;
+  weekday: Weekday;
+  inMonth: boolean;
+}
+
+/** สร้างตารางเดือน (array ของสัปดาห์ๆ ละ 7 ช่อง) เริ่มวันอาทิตย์ รวมช่องว่างก่อน/หลังเดือนให้ครบสัปดาห์ */
+export function buildMonthGrid(year: number, month0: number): MonthCell[][] {
+  const firstOfMonth = new Date(year, month0, 1);
+  const startWeekday = firstOfMonth.getDay() as Weekday;
+  const daysInMonth = new Date(year, month0 + 1, 0).getDate();
+
+  const cells: MonthCell[] = [];
+  for (let i = 0; i < startWeekday; i++) {
+    cells.push({ date: null, dateStr: null, weekday: i as Weekday, inMonth: false });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month0, d);
+    cells.push({ date, dateStr: toDateStr(date), weekday: date.getDay() as Weekday, inMonth: true });
+  }
+  while (cells.length % 7 !== 0) {
+    const weekday = (cells.length % 7) as Weekday;
+    cells.push({ date: null, dateStr: null, weekday, inMonth: false });
+  }
+
+  const weeks: MonthCell[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+export function specialDaysForDate(dateStr: string, specialDays: SpecialDay[]): SpecialDay[] {
+  return specialDays.filter((s) => s.date === dateStr);
+}
+
+/** สีของ badge ตามประเภทวันสำคัญ — ใช้ทั้งจุดสีในปฏิทินและป้ายในโหมดพิมพ์ */
+export function specialDayColor(dayType: SpecialDay['dayType']): { dot: string; text: string; bg: string; border: string } {
+  switch (dayType) {
+    case 'วันหยุดราชการ':
+      return { dot: '#DC2626', text: '#991B1B', bg: '#FEE2E2', border: '#FECACA' };
+    case 'วันพระ':
+      return { dot: '#EA580C', text: '#9A3412', bg: '#FFEDD5', border: '#FED7AA' };
+    case 'วันสำคัญ':
+    default:
+      return { dot: '#D97706', text: '#92400E', bg: '#FEF3C7', border: '#FDE68A' };
+  }
+}
+
+/** หาแถวคู่สลับกะของ entry นี้ (อีกฝั่งของ swapPairId เดียวกัน) */
+export function swapPartnerEntry(entry: WorkCalendarEntry, workCalendarEntries: WorkCalendarEntry[]): WorkCalendarEntry | null {
+  if (!entry.swapPairId) return null;
+  return workCalendarEntries.find((e) => e.swapPairId === entry.swapPairId && e.id !== entry.id) ?? null;
+}
+
+export function monthLabel(year: number, month0: number): string {
+  const THAI_MONTHS = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+  ];
+  return `${THAI_MONTHS[month0]} ${year + 543}`;
+}
+
+/** ตัวอักษรย่อ 2 ตัวจากชื่อเล่นพนักงาน สำหรับ avatar */
+export function initials(employee: Employee): string {
+  return employee.nickname.slice(0, 2).toUpperCase();
+}
+
+// ============ เติมวันสำคัญอัตโนมัติ (คำนวณล่วงหน้า ไม่ใช่ query AI จริง) — เฟส 5 ============
+// หมายเหตุ: วันหยุดราชการใช้รายการทางการที่ทราบล่วงหน้า (วันที่คงที่ + วันหยุดตามมติ ครม. ที่พบบ่อย)
+// ส่วนวันพระคำนวณจากปฏิทินจันทรคติแบบประมาณการ (ข้างขึ้น/ข้างแรม 8 ค่ำ, 15 ค่ำ) — เจ้าของ/ผู้จัดการตรวจสอบและแก้ไขได้เสมอ
+
+/** วันหยุดราชการไทยที่วันที่ตายตัวทุกปี (ไม่รวมวันหยุดชดเชย/วันหยุดพิเศษที่ ครม. ประกาศเพิ่มเป็นปีๆ ไป) */
+export function fixedThaiPublicHolidays(year: number): { date: string; label: string }[] {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const d = (m: number, day: number) => `${year}-${pad(m)}-${pad(day)}`;
+  return [
+    { date: d(1, 1), label: 'วันขึ้นปีใหม่' },
+    { date: d(4, 6), label: 'วันจักรี' },
+    { date: d(4, 13), label: 'วันสงกรานต์' },
+    { date: d(4, 14), label: 'วันสงกรานต์' },
+    { date: d(4, 15), label: 'วันสงกรานต์' },
+    { date: d(5, 1), label: 'วันแรงงานแห่งชาติ' },
+    { date: d(5, 4), label: 'วันฉัตรมงคล' },
+    { date: d(7, 28), label: 'วันเฉลิมพระชนมพรรษา ร.10' },
+    { date: d(8, 12), label: 'วันแม่แห่งชาติ' },
+    { date: d(10, 13), label: 'วันคล้ายวันสวรรคต ร.9' },
+    { date: d(10, 23), label: 'วันปิยมหาราช' },
+    { date: d(12, 5), label: 'วันพ่อแห่งชาติ' },
+    { date: d(12, 10), label: 'วันรัฐธรรมนูญ' },
+    { date: d(12, 31), label: 'วันสิ้นปี' },
+  ];
+}
+
+/** คำนวณวันพระโดยประมาณ (8 ค่ำ/15 ค่ำ ข้างขึ้น-ข้างแรม) จากรอบจันทรคติ synodic month ~29.530589 วัน
+ *  อ้างอิงวันเดือนมืด (new moon) จริงใกล้เคียง 2000-01-06 12:14 UTC เป็นจุดเริ่ม แล้วนับ 8/15/23/30 ของแต่ละรอบ
+ *  เป็นการประมาณการเพื่อใช้แสดงผลเบื้องต้นเท่านั้น ไม่ใช่ปฏิทินจันทรคติไทยที่แม่นยำ 100% */
+export function approximateBuddhistHolyDays(year: number): { date: string; label: string }[] {
+  const SYNODIC = 29.530588853;
+  const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 12, 14, 0); // ms
+  const MS_PER_DAY = 86400000;
+
+  const yearStart = Date.UTC(year, 0, 1);
+  const yearEnd = Date.UTC(year, 11, 31, 23, 59, 59);
+
+  const cyclesSinceKnown = (yearStart - KNOWN_NEW_MOON) / (SYNODIC * MS_PER_DAY);
+  let cycle = Math.floor(cyclesSinceKnown) - 1;
+
+  const results: { date: string; label: string }[] = [];
+  const seen = new Set<string>();
+
+  while (true) {
+    const newMoonMs = KNOWN_NEW_MOON + cycle * SYNODIC * MS_PER_DAY;
+    if (newMoonMs > yearEnd) break;
+    // ขึ้น 8 ค่ำ (~+7 วัน), ขึ้น 15 ค่ำ/เพ็ญ (~+14 วัน), แรม 8 ค่ำ (~+22 วัน), แรม 14/15 ค่ำ (~+29 วัน จนถึงเดือนถัดไป)
+    const offsets = [7, 14, 22, 29];
+    for (const off of offsets) {
+      const ms = newMoonMs + off * MS_PER_DAY;
+      if (ms < yearStart || ms > yearEnd) continue;
+      const dt = new Date(ms);
+      const dateStr = toDateStr(dt);
+      if (seen.has(dateStr)) continue;
+      seen.add(dateStr);
+      results.push({ date: dateStr, label: '' });
+    }
+    cycle += 1;
+  }
+
+  return results.sort((a, b) => a.date.localeCompare(b.date));
+}

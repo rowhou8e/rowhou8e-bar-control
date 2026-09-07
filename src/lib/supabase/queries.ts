@@ -29,12 +29,20 @@ import type {
   PurchaseOrderStatus,
   PurchaseRequest,
   PurchaseRequestStatus,
+  SpecialDay,
+  SpecialDayType,
   Station,
   StockCategory,
   StockItem,
   StoreHoliday,
   Supplier,
   SupplierItemPrice,
+  Weekday,
+  WeeklyPatternEntry,
+  WorkCalendarEntry,
+  WorkCalendarHistoryEntry,
+  WorkCalendarReasonType,
+  WorkCalendarStatus,
 } from '../types';
 
 // ================= STATIONS (แผนก) =================
@@ -1677,6 +1685,306 @@ export async function updateEmployee(
     actor_id: actorId,
     target_label: `พนักงาน: ${before?.name ?? id}`,
     detail,
+  });
+}
+
+// ================= ปฏิทินการทำงาน (Work Schedule Calendar) — เฟส 5 =================
+export async function fetchWeeklyPatterns(): Promise<WeeklyPatternEntry[]> {
+  const sb = getSupabaseClient();
+  const { data, error } = await sb.from('employee_weekly_pattern').select('*');
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    employeeId: r.employee_id,
+    weekday: r.weekday,
+    isDayOff: r.is_day_off,
+    updatedBy: r.updated_by,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function setWeeklyPattern(employeeId: string, days: { weekday: Weekday; isDayOff: boolean }[], actorId: string) {
+  const sb = getSupabaseClient();
+  const rows = days.map((d) => ({
+    employee_id: employeeId,
+    weekday: d.weekday,
+    is_day_off: d.isDayOff,
+    updated_by: actorId,
+    updated_at: new Date().toISOString(),
+  }));
+  const { error } = await sb.from('employee_weekly_pattern').upsert(rows, { onConflict: 'employee_id,weekday' });
+  if (error) throw error;
+
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: actorId,
+    target_label: employeeId,
+    detail: 'แก้ไขรูปแบบวันหยุดประจำสัปดาห์',
+  });
+}
+
+export async function fetchWorkCalendarEntries(): Promise<WorkCalendarEntry[]> {
+  const sb = getSupabaseClient();
+  const { data, error } = await sb.from('work_calendar_entries').select('*').order('entry_date');
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    employeeId: r.employee_id,
+    date: r.entry_date,
+    status: r.status,
+    reasonType: r.reason_type,
+    note: r.note ?? '',
+    swapPairId: r.swap_pair_id,
+    updatedBy: r.updated_by,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function setCalendarDay(input: {
+  employeeId: string;
+  date: string;
+  status: WorkCalendarStatus;
+  reasonType: WorkCalendarReasonType | null;
+  note: string;
+  actorId: string;
+}) {
+  const sb = getSupabaseClient();
+  const { data: before } = await sb
+    .from('work_calendar_entries')
+    .select('status')
+    .eq('employee_id', input.employeeId)
+    .eq('entry_date', input.date)
+    .maybeSingle();
+
+  const { error } = await sb.from('work_calendar_entries').upsert(
+    {
+      employee_id: input.employeeId,
+      entry_date: input.date,
+      status: input.status,
+      reason_type: input.reasonType,
+      note: input.note,
+      updated_by: input.actorId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'employee_id,entry_date' }
+  );
+  if (error) throw error;
+
+  await sb.from('work_calendar_history').insert({
+    entry_date: input.date,
+    employee_id: input.employeeId,
+    old_status: before?.status ?? null,
+    new_status: input.status,
+    reason_type: input.reasonType,
+    note: input.note,
+    changed_by: input.actorId,
+  });
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: input.actorId,
+    target_label: input.employeeId,
+    detail: `${input.date}: ${input.status === 'off' ? 'หยุด' : 'ทำงาน'}${input.reasonType ? ` (${input.reasonType})` : ''}`,
+  });
+}
+
+export async function clearCalendarDay(employeeId: string, date: string, actorId: string) {
+  const sb = getSupabaseClient();
+  const { data: existing } = await sb
+    .from('work_calendar_entries')
+    .select('status')
+    .eq('employee_id', employeeId)
+    .eq('entry_date', date)
+    .maybeSingle();
+  if (!existing) return;
+
+  const { error } = await sb.from('work_calendar_entries').delete().eq('employee_id', employeeId).eq('entry_date', date);
+  if (error) throw error;
+
+  await sb.from('work_calendar_history').insert({
+    entry_date: date,
+    employee_id: employeeId,
+    old_status: existing.status,
+    new_status: 'work',
+    reason_type: null,
+    note: 'ยกเลิกการแก้ไข — กลับไปใช้ค่าเริ่มต้นจาก pattern',
+    changed_by: actorId,
+  });
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: actorId,
+    target_label: employeeId,
+    detail: `${date}: ยกเลิกข้อยกเว้น กลับไปใช้ pattern`,
+  });
+}
+
+export async function createCalendarSwap(input: {
+  employeeAId: string;
+  dateA: string;
+  statusA: WorkCalendarStatus;
+  employeeBId: string;
+  dateB: string;
+  statusB: WorkCalendarStatus;
+  note: string;
+  actorId: string;
+}) {
+  const sb = getSupabaseClient();
+  const swapPairId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  const rows = [
+    {
+      employee_id: input.employeeAId,
+      entry_date: input.dateA,
+      status: input.statusA,
+      reason_type: 'สลับกะ',
+      note: input.note,
+      swap_pair_id: swapPairId,
+      updated_by: input.actorId,
+      updated_at: now,
+    },
+    {
+      employee_id: input.employeeBId,
+      entry_date: input.dateB,
+      status: input.statusB,
+      reason_type: 'สลับกะ',
+      note: input.note,
+      swap_pair_id: swapPairId,
+      updated_by: input.actorId,
+      updated_at: now,
+    },
+  ];
+  const { error } = await sb.from('work_calendar_entries').upsert(rows, { onConflict: 'employee_id,entry_date' });
+  if (error) throw error;
+
+  await sb.from('work_calendar_history').insert(
+    rows.map((r) => ({
+      entry_date: r.entry_date,
+      employee_id: r.employee_id,
+      old_status: null,
+      new_status: r.status,
+      reason_type: r.reason_type,
+      note: r.note,
+      changed_by: input.actorId,
+    }))
+  );
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: input.actorId,
+    target_label: 'สลับกะ',
+    detail: `สลับกะ: ${input.dateA} ↔ ${input.dateB}`,
+  });
+}
+
+export async function removeCalendarSwap(swapPairId: string, actorId: string) {
+  const sb = getSupabaseClient();
+  const { data: pair } = await sb.from('work_calendar_entries').select('employee_id, entry_date, status').eq('swap_pair_id', swapPairId);
+  if (!pair || pair.length === 0) return;
+
+  const { error } = await sb.from('work_calendar_entries').delete().eq('swap_pair_id', swapPairId);
+  if (error) throw error;
+
+  await sb.from('work_calendar_history').insert(
+    pair.map((r: any) => ({
+      entry_date: r.entry_date,
+      employee_id: r.employee_id,
+      old_status: r.status,
+      new_status: 'work',
+      reason_type: null,
+      note: 'ยกเลิกคู่สลับกะ',
+      changed_by: actorId,
+    }))
+  );
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: actorId,
+    target_label: 'สลับกะ',
+    detail: 'ยกเลิกคู่สลับกะ',
+  });
+}
+
+export async function fetchWorkCalendarHistory(): Promise<WorkCalendarHistoryEntry[]> {
+  const sb = getSupabaseClient();
+  const { data, error } = await sb.from('work_calendar_history').select('*').order('changed_at', { ascending: false }).limit(500);
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    date: r.entry_date,
+    employeeId: r.employee_id,
+    oldStatus: r.old_status,
+    newStatus: r.new_status,
+    reasonType: r.reason_type,
+    note: r.note ?? '',
+    changedBy: r.changed_by,
+    changedAt: r.changed_at,
+  }));
+}
+
+export async function fetchSpecialDays(): Promise<SpecialDay[]> {
+  const sb = getSupabaseClient();
+  const { data, error } = await sb.from('special_days').select('*').order('special_date');
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    date: r.special_date,
+    dayType: r.day_type,
+    label: r.label ?? '',
+    source: r.source,
+    fetchedAt: r.fetched_at,
+  }));
+}
+
+export async function addSpecialDay(input: { date: string; dayType: SpecialDayType; label: string; actorId: string }) {
+  const sb = getSupabaseClient();
+  const { error } = await sb.from('special_days').upsert(
+    {
+      special_date: input.date,
+      day_type: input.dayType,
+      label: input.label,
+      source: 'manual',
+    },
+    { onConflict: 'special_date,day_type,label', ignoreDuplicates: true }
+  );
+  if (error) throw error;
+
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: input.actorId,
+    target_label: input.dayType,
+    detail: `เพิ่ม${input.dayType} · ${input.date}${input.label ? `: ${input.label}` : ''}`,
+  });
+}
+
+export async function removeSpecialDay(id: string, actorId: string) {
+  const sb = getSupabaseClient();
+  const { data: day } = await sb.from('special_days').select('special_date, day_type').eq('id', id).single();
+  const { error } = await sb.from('special_days').delete().eq('id', id);
+  if (error) throw error;
+
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: actorId,
+    target_label: day?.day_type ?? '',
+    detail: `ลบ${day?.day_type ?? ''} · ${day?.special_date ?? id}`,
+  });
+}
+
+export async function bulkAddSpecialDays(days: { date: string; dayType: SpecialDayType; label: string }[], actorId: string) {
+  if (days.length === 0) return;
+  const sb = getSupabaseClient();
+  const rows = days.map((d) => ({
+    special_date: d.date,
+    day_type: d.dayType,
+    label: d.label,
+    source: 'ai',
+  }));
+  const { error } = await sb.from('special_days').upsert(rows, { onConflict: 'special_date,day_type,label', ignoreDuplicates: true });
+  if (error) throw error;
+
+  await sb.from('history_logs').insert({
+    action_type: 'calendar_change',
+    actor_id: actorId,
+    target_label: 'วันสำคัญ (AI)',
+    detail: `เพิ่ม ${days.length} รายการจาก AI`,
   });
 }
 

@@ -457,3 +457,107 @@ begin
     execute 'alter publication supabase_realtime add table public.cash_reports';
   end if;
 end $$;
+
+-- ============================================================================
+-- 10) WORK CALENDAR — ปฏิทินการทำงาน (วันหยุด/วันทำงานของพนักงานแต่ละคน) — เฟส 5
+-- โมเดลข้อมูล 2 ชั้น:
+--   1) employee_weekly_pattern = วันหยุดประจำสัปดาห์ของพนักงานแต่ละคน (เช่น "หยุดทุกวันพุธ") — ค่าเริ่มต้น
+--   2) work_calendar_entries = ข้อยกเว้นเฉพาะวัน (ลา/สลับกะ/อื่นๆ) — ถ้ามีแถวในวันนั้นให้ใช้ค่านี้แทนค่าเริ่มต้นจาก pattern
+-- สถานะจริงของวันใดวันหนึ่ง (คำนวณที่ชั้นแอป):
+--   (1) มีแถวใน work_calendar_entries สำหรับวันนั้นไหม -> ถ้ามี ใช้ค่านั้น
+--   (2) ถ้าไม่มี ดู employee_weekly_pattern ตามวันในสัปดาห์ของพนักงานคนนั้น
+--   (3) ถ้าไม่มีทั้งคู่ ค่าเริ่มต้น = 'work' (ทำงาน)
+-- สิทธิ์แก้ไข: เจ้าของแก้ของทุกคนได้ (รวมของตัวเอง) — ผู้จัดการแก้ของทุกคนได้ ยกเว้นของเจ้าของ —
+--            พนักงานดูได้อย่างเดียว + เห็นแบนเนอร์สถานะของตัวเอง (ดู RLS ด้านล่าง)
+-- ปฏิทินนี้รวมพนักงานทุกประเภท (รายเดือน/พาร์ทไทม์/รายวัน) และไม่เชื่อมกับการคำนวณเงินเดือน/ค่าแรง
+-- ============================================================================
+
+-- 10a) รูปแบบวันหยุดประจำสัปดาห์ (ค่าเริ่มต้นต่อพนักงาน — พนักงานส่วนใหญ่หยุดวันเดิมทุกสัปดาห์)
+create table if not exists public.employee_weekly_pattern (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references public.employees (id) on delete cascade,
+  -- 0=อาทิตย์, 1=จันทร์, 2=อังคาร, 3=พุธ, 4=พฤหัสบดี, 5=ศุกร์, 6=เสาร์ (ตรงกับ JS Date.getDay())
+  weekday smallint not null check (weekday between 0 and 6),
+  is_day_off boolean not null default false,
+  updated_by uuid references public.employees (id),
+  updated_at timestamptz not null default now(),
+  unique (employee_id, weekday)
+);
+
+create index if not exists idx_weekly_pattern_employee on public.employee_weekly_pattern (employee_id);
+
+-- 10b) ข้อยกเว้นเฉพาะวัน (ลา/สลับกะ/อื่นๆ) — มีผลเหนือกว่า pattern ประจำสัปดาห์เสมอ
+create table if not exists public.work_calendar_entries (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references public.employees (id) on delete cascade,
+  entry_date date not null,
+  status text not null check (status in ('work', 'off')),
+  reason_type text check (reason_type in ('ลา', 'สลับกะ', 'อื่นๆ')),
+  note text not null default '',
+  swap_pair_id uuid,
+  updated_by uuid references public.employees (id),
+  updated_at timestamptz not null default now(),
+  unique (employee_id, entry_date)
+);
+
+create index if not exists idx_calendar_entries_date on public.work_calendar_entries (entry_date);
+create index if not exists idx_calendar_entries_employee on public.work_calendar_entries (employee_id);
+create index if not exists idx_calendar_entries_swap_pair on public.work_calendar_entries (swap_pair_id) where swap_pair_id is not null;
+
+-- 10c) ประวัติการแก้ไขปฏิทิน (append-only ห้ามแก้ไข/ลบ — ดู RLS) — ตอบ "ใครเปลี่ยนวันหยุดใคร เมื่อไหร่"
+create table if not exists public.work_calendar_history (
+  id uuid primary key default gen_random_uuid(),
+  entry_date date not null,
+  employee_id uuid not null references public.employees (id) on delete cascade,
+  old_status text,
+  new_status text not null check (new_status in ('work', 'off')),
+  reason_type text check (reason_type in ('ลา', 'สลับกะ', 'อื่นๆ')),
+  note text not null default '',
+  changed_by uuid references public.employees (id),
+  changed_at timestamptz not null default now()
+);
+
+create index if not exists idx_calendar_history_date_employee on public.work_calendar_history (entry_date, employee_id);
+create index if not exists idx_calendar_history_changed_at on public.work_calendar_history (changed_at desc);
+
+-- 10d) วันพระ/วันสำคัญ/วันหยุดราชการ — ข้อมูลอ้างอิงแสดงบนปฏิทิน (ไม่ผูกกับ work/off) ดึงจาก AI หรือกรอกเอง
+create table if not exists public.special_days (
+  id uuid primary key default gen_random_uuid(),
+  special_date date not null,
+  day_type text not null check (day_type in ('วันพระ', 'วันหยุดราชการ', 'วันสำคัญ')),
+  label text not null default '',
+  source text not null default 'manual' check (source in ('ai', 'manual')),
+  fetched_at timestamptz not null default now(),
+  unique (special_date, day_type, label)
+);
+
+create index if not exists idx_special_days_date on public.special_days (special_date);
+
+-- ขยาย history_logs.action_type ให้รองรับการแก้ไขปฏิทินการทำงาน (log คู่กับ work_calendar_history ด้านบน
+-- เพื่อให้ขึ้นในหน้า "ประวัติการทำงาน" รวมเหมือนฟีเจอร์อื่น ๆ ในระบบ)
+alter table public.history_logs drop constraint if exists history_logs_action_type_check;
+alter table public.history_logs add constraint history_logs_action_type_check check (action_type in (
+  'checklist_submit', 'production_log', 'lot_status_change', 'stock_adjust',
+  'waste_report', 'purchase_create', 'purchase_approve', 'purchase_receive',
+  'settings_change', 'supplier_change', 'po_create', 'po_status_change',
+  'cash_report_submit', 'cash_report_edit', 'order_reminder_send', 'order_reminder_ack',
+  'po_price_update', 'calendar_change'
+));
+
+-- เปิด Realtime ให้ 4 ตารางใหม่ของปฏิทินการทำงาน (แยก do block จากของเดิมด้านบน เพื่อไม่ต้องแก้โค้ดเดิม)
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'employee_weekly_pattern', 'work_calendar_entries', 'work_calendar_history', 'special_days'
+  ]
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;

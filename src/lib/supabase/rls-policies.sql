@@ -367,3 +367,80 @@ create policy "order_reminders_delete_all"
 -- create policy "employee_photos_public_read" on storage.objects for select using (bucket_id = 'employee-photos');
 -- create policy "employee_photos_authenticated_upload" on storage.objects for insert
 --   with check (bucket_id = 'employee-photos' and auth.role() = 'authenticated');
+
+-- ---------------- WORK CALENDAR (ปฏิทินการทำงาน) — เฟส 5 ----------------
+alter table public.employee_weekly_pattern enable row level security;
+alter table public.work_calendar_entries enable row level security;
+alter table public.work_calendar_history enable row level security;
+alter table public.special_days enable row level security;
+
+-- ทุกคนอ่านได้ทุกแถว (พนักงานทุกคนต้องเห็นปฏิทินของทุกคน ไม่ใช่แค่ของตัวเอง)
+create policy "weekly_pattern_select_all"
+on public.employee_weekly_pattern for select using (auth.role() = 'authenticated');
+
+-- เจ้าของแก้ไขได้ทุกคน (รวมของตัวเอง)
+create policy "weekly_pattern_write_owner"
+on public.employee_weekly_pattern for all
+using (public.current_employee_role() = 'owner')
+with check (public.current_employee_role() = 'owner');
+
+-- ผู้จัดการแก้ไขได้ทุกคน ยกเว้นของเจ้าของ
+create policy "weekly_pattern_write_manager_not_owner"
+on public.employee_weekly_pattern for all
+using (
+  public.current_employee_role() = 'manager'
+  and not exists (
+    select 1 from public.employees e
+    where e.id = employee_weekly_pattern.employee_id and e.role = 'owner'
+  )
+)
+with check (
+  public.current_employee_role() = 'manager'
+  and not exists (
+    select 1 from public.employees e
+    where e.id = employee_weekly_pattern.employee_id and e.role = 'owner'
+  )
+);
+
+create policy "calendar_entries_select_all"
+on public.work_calendar_entries for select using (auth.role() = 'authenticated');
+
+create policy "calendar_entries_write_owner"
+on public.work_calendar_entries for all
+using (public.current_employee_role() = 'owner')
+with check (public.current_employee_role() = 'owner');
+
+create policy "calendar_entries_write_manager_not_owner"
+on public.work_calendar_entries for all
+using (
+  public.current_employee_role() = 'manager'
+  and not exists (
+    select 1 from public.employees e
+    where e.id = work_calendar_entries.employee_id and e.role = 'owner'
+  )
+)
+with check (
+  public.current_employee_role() = 'manager'
+  and not exists (
+    select 1 from public.employees e
+    where e.id = work_calendar_entries.employee_id and e.role = 'owner'
+  )
+);
+
+-- ---------------- WORK CALENDAR HISTORY (append-only) ----------------
+create policy "calendar_history_select_all"
+on public.work_calendar_history for select using (auth.role() = 'authenticated');
+
+create policy "calendar_history_insert_owner_manager"
+on public.work_calendar_history for insert
+with check (public.current_employee_role() in ('owner', 'manager'));
+-- ไม่มี policy UPDATE/DELETE — ประวัติการแก้ไขปฏิทิน ห้ามแก้ไข/ลบ (เช่นเดียวกับ history_logs)
+
+-- ---------------- SPECIAL DAYS (วันพระ/วันสำคัญ/วันหยุดราชการ) ----------------
+create policy "special_days_select_all"
+on public.special_days for select using (auth.role() = 'authenticated');
+
+create policy "special_days_write_owner_manager"
+on public.special_days for all
+using (public.current_employee_role() in ('owner', 'manager'))
+with check (public.current_employee_role() in ('owner', 'manager'));

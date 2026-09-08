@@ -129,8 +129,16 @@ export default function SchedulePrintPage() {
                 return (
                   <div
                     key={idx}
-                    style={{ border: '1px dashed #E5E7EB', borderRadius: '6px', minHeight: '78px', background: '#FAFAFA' }}
-                  />
+                    style={{
+                      border: '1px solid #F3F4F6',
+                      borderRadius: '6px',
+                      minHeight: '78px',
+                      padding: '5px 7px',
+                      background: '#FAFAFA',
+                    }}
+                  >
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#D1D5DB' }}>{cell.date?.getDate()}</span>
+                  </div>
                 );
               }
               const dateStr = cell.dateStr;
@@ -138,7 +146,7 @@ export default function SchedulePrintPage() {
               const badges = specialDaysForDate(dateStr, specialDays);
               const offList = employeesOffOnDate(dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries);
               const names = offList
-                .map(({ employee: e }) => (e.role === 'staff' ? e.name : `${e.name} (${roleAbbrev(e.role)})`))
+                .map(({ employee: e }) => (e.role === 'staff' ? e.nickname : `${e.nickname} (${roleAbbrev(e.role)})`))
                 .join(', ');
 
               return (

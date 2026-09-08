@@ -54,23 +54,29 @@ export interface MonthCell {
   inMonth: boolean;
 }
 
-/** สร้างตารางเดือน (array ของสัปดาห์ๆ ละ 7 ช่อง) เริ่มวันอาทิตย์ รวมช่องว่างก่อน/หลังเดือนให้ครบสัปดาห์ */
+/**
+ * สร้างตารางเดือน (array ของสัปดาห์ๆ ละ 7 ช่อง) เริ่มวันอาทิตย์
+ * ช่องก่อน/หลังเดือน เติมด้วยวันที่จริงของเดือนก่อนหน้า/ถัดไป (inMonth: false) เพื่อให้ปฏิทินเต็มทุกช่อง ไม่มีช่องว่าง
+ */
 export function buildMonthGrid(year: number, month0: number): MonthCell[][] {
   const firstOfMonth = new Date(year, month0, 1);
   const startWeekday = firstOfMonth.getDay() as Weekday;
   const daysInMonth = new Date(year, month0 + 1, 0).getDate();
 
   const cells: MonthCell[] = [];
-  for (let i = 0; i < startWeekday; i++) {
-    cells.push({ date: null, dateStr: null, weekday: i as Weekday, inMonth: false });
+  for (let i = startWeekday - 1; i >= 0; i--) {
+    const date = new Date(year, month0, -i);
+    cells.push({ date, dateStr: toDateStr(date), weekday: date.getDay() as Weekday, inMonth: false });
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month0, d);
     cells.push({ date, dateStr: toDateStr(date), weekday: date.getDay() as Weekday, inMonth: true });
   }
+  let nextDay = 1;
   while (cells.length % 7 !== 0) {
-    const weekday = (cells.length % 7) as Weekday;
-    cells.push({ date: null, dateStr: null, weekday, inMonth: false });
+    const date = new Date(year, month0 + 1, nextDay);
+    cells.push({ date, dateStr: toDateStr(date), weekday: date.getDay() as Weekday, inMonth: false });
+    nextDay++;
   }
 
   const weeks: MonthCell[][] = [];

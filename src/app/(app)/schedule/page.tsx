@@ -163,7 +163,13 @@ export default function SchedulePage() {
           </div>
           <div className="grid grid-cols-7 gap-1">
             {weeks.flat().map((cell, idx) => {
-              if (!cell.inMonth || !cell.dateStr) return <div key={idx} className="min-h-[58px]" />;
+              if (!cell.inMonth || !cell.dateStr) {
+                return (
+                  <div key={idx} className="min-h-[58px] rounded-[10px] p-1 opacity-40">
+                    <span className="text-[11px] font-semibold text-gray-400">{cell.date?.getDate()}</span>
+                  </div>
+                );
+              }
 
               const dateStr = cell.dateStr;
               const isToday = dateStr === todayStr;
@@ -213,7 +219,7 @@ export default function SchedulePage() {
                               ? { border: `1.3px dashed ${e.avatarColor}`, color: e.avatarColor, backgroundColor: 'transparent' }
                               : { backgroundColor: e.avatarColor, color: '#fff' }
                           }
-                          title={`${e.name} (${e.nickname})`}
+                          title={e.nickname}
                         >
                           {initials(e)}
                         </span>

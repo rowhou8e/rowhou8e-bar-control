@@ -77,7 +77,7 @@ export function BottomNav() {
 }
 
 function iconBase(active: boolean) {
-  return active ? '#EA580C' : '#9CA3AF';
+  return active ? '#424242' : '#9CA3AF';
 }
 
 function HomeIcon({ active }: { active: boolean }) {

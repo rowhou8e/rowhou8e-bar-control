@@ -85,7 +85,7 @@ export default function SchedulePrintPage() {
                   width: '38px',
                   height: '38px',
                   borderRadius: '10px',
-                  background: '#EA580C',
+                  background: '#424242',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -145,11 +145,11 @@ export default function SchedulePrintPage() {
                 <div
                   key={idx}
                   style={{
-                    border: isToday ? '2px solid #EA580C' : '1px solid #E5E7EB',
+                    border: isToday ? '2px solid #424242' : '1px solid #E5E7EB',
                     borderRadius: '6px',
                     minHeight: '78px',
                     padding: '5px 7px',
-                    background: isToday || badges.length > 0 ? '#FFF7ED' : '#fff',
+                    background: isToday || badges.length > 0 ? '#F5F5F5' : '#fff',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
@@ -160,12 +160,12 @@ export default function SchedulePrintPage() {
                       style={{
                         fontSize: '12px',
                         fontWeight: isToday ? 800 : 700,
-                        color: isToday ? '#EA580C' : cell.weekday === 0 || cell.weekday === 6 ? '#2563EB' : '#374151',
+                        color: isToday ? '#424242' : cell.weekday === 0 || cell.weekday === 6 ? '#2563EB' : '#374151',
                       }}
                     >
                       {cell.date?.getDate()}
                     </span>
-                    {isToday && <span style={{ fontSize: '8px', fontWeight: 700, color: '#EA580C' }}>วันนี้</span>}
+                    {isToday && <span style={{ fontSize: '8px', fontWeight: 700, color: '#424242' }}>วันนี้</span>}
                     {!isToday &&
                       badges[0] &&
                       (() => {

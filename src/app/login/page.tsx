@@ -58,7 +58,18 @@ function LiveLoginForm() {
   return (
     <div className="mx-auto flex min-h-screen max-w-app flex-col bg-white px-6 pb-10 pt-16">
       <div className="mb-10 flex flex-col items-center">
-        <img src="/logo.png" alt="Rowhouse" className="h-16 w-16 rounded-2xl object-cover" />
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Rowhouse" className="h-16 w-16 rounded-2xl object-cover" />
+          <a
+            href="https://rowhou8e-payroll.netlify.app/#portal"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="สลิปเงินเดือน"
+            className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl active:opacity-80"
+          >
+            <img src="/payslip-icon.png" alt="สลิปเงินเดือน" className="h-full w-full object-cover" />
+          </a>
+        </div>
         <h1 className="mt-4 text-xl font-bold text-gray-900">Rowhou8e Bar Control</h1>
         <p className="mt-1 text-sm text-gray-500">เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน</p>
       </div>
@@ -193,7 +204,18 @@ function MockPinLogin({ employees }: { employees: Employee[] }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-app flex-col bg-white px-6 pb-10 pt-16">
       <div className="mb-10 flex flex-col items-center">
-        <img src="/logo.png" alt="Rowhouse" className="h-16 w-16 rounded-2xl object-cover" />
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Rowhouse" className="h-16 w-16 rounded-2xl object-cover" />
+          <a
+            href="https://rowhou8e-payroll.netlify.app/#portal"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="สลิปเงินเดือน"
+            className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl active:opacity-80"
+          >
+            <img src="/payslip-icon.png" alt="สลิปเงินเดือน" className="h-full w-full object-cover" />
+          </a>
+        </div>
         <h1 className="mt-4 text-xl font-bold text-gray-900">Rowhou8e Bar Control</h1>
         <p className="mt-1 text-sm text-gray-500">เลือกชื่อของคุณเพื่อเข้าสู่ระบบ</p>
       </div>

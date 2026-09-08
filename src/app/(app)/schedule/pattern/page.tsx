@@ -7,7 +7,7 @@ import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { Header } from '@/components/Header';
 import { WEEKDAY_SHORT, initials } from '@/lib/calendar-derive';
 import { roleLabel } from '@/lib/derive';
-import type { Weekday } from '@/lib/types';
+import type { Employee, Weekday } from '@/lib/types';
 
 export default function WeeklyPatternSettingsPage() {
   const router = useRouter();
@@ -16,6 +16,13 @@ export default function WeeklyPatternSettingsPage() {
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
   const canManage = employee?.role === 'owner' || employee?.role === 'manager';
+
+  // ผู้จัดการแก้ไขวันหยุดประจำของทุกคนได้ ยกเว้นของเจ้าของร้าน (ต้องให้เจ้าของแก้เอง) — ตรงกับสิทธิ์ฝั่งฐานข้อมูล
+  function canEditEmployee(emp: Employee): boolean {
+    if (employee?.role === 'owner') return true;
+    if (employee?.role === 'manager') return emp.role !== 'owner';
+    return false;
+  }
 
   // draft: employeeId -> set ของ weekday ที่หยุดประจำ
   const [draft, setDraft] = useState<Record<string, Set<Weekday>>>({});
@@ -30,13 +37,13 @@ export default function WeeklyPatternSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmployees.length]);
 
-  function toggleDay(employeeId: string, weekday: Weekday) {
-    if (!canManage) return;
+  function toggleDay(emp: Employee, weekday: Weekday) {
+    if (!canEditEmployee(emp)) return;
     setDraft((prev) => {
-      const next = new Set(prev[employeeId] ?? []);
+      const next = new Set(prev[emp.id] ?? []);
       if (next.has(weekday)) next.delete(weekday);
       else next.add(weekday);
-      return { ...prev, [employeeId]: next };
+      return { ...prev, [emp.id]: next };
     });
   }
 
@@ -45,11 +52,16 @@ export default function WeeklyPatternSettingsPage() {
     setSaving(true);
     try {
       for (const emp of activeEmployees) {
+        // ข้ามแถวที่ตัวเองไม่มีสิทธิ์แก้ (เช่น ผู้จัดการเจอแถวเจ้าของ) ไม่งั้นฐานข้อมูลจะปฏิเสธและทำให้บันทึกทั้งหมดล้มเหลว
+        if (!canEditEmployee(emp)) continue;
         const days: Weekday[] = [0, 1, 2, 3, 4, 5, 6] as Weekday[];
         const payload = days.map((weekday) => ({ weekday, isDayOff: (draft[emp.id] ?? new Set()).has(weekday) }));
         await store.setWeeklyPattern(emp.id, payload, employee.id);
       }
       router.back();
+    } catch (err) {
+      console.error(err);
+      window.alert('บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setSaving(false);
     }
@@ -73,8 +85,9 @@ export default function WeeklyPatternSettingsPage() {
           {activeEmployees.map((emp) => {
             const days = draft[emp.id] ?? new Set<Weekday>();
             const caption = patternCaption(days);
+            const editable = canEditEmployee(emp);
             return (
-              <div key={emp.id} className="border-b border-gray-50 px-1.5 py-2.5 last:border-b-0">
+              <div key={emp.id} className={`border-b border-gray-50 px-1.5 py-2.5 last:border-b-0 ${editable ? '' : 'opacity-50'}`}>
                 <div className="flex items-center gap-2.5">
                   <div
                     className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
@@ -94,9 +107,9 @@ export default function WeeklyPatternSettingsPage() {
                         <button
                           key={i}
                           type="button"
-                          disabled={!canManage}
-                          onClick={() => toggleDay(emp.id, weekday)}
-                          className={`flex h-[27px] w-[27px] items-center justify-center rounded-full text-[10.5px] font-bold ${
+                          disabled={!editable}
+                          onClick={() => toggleDay(emp, weekday)}
+                          className={`flex h-[27px] w-[27px] items-center justify-center rounded-full text-[10.5px] font-bold disabled:cursor-not-allowed ${
                             selected ? 'bg-brand-600 text-white' : 'border-[1.3px] border-gray-200 text-gray-300'
                           }`}
                         >
@@ -107,6 +120,7 @@ export default function WeeklyPatternSettingsPage() {
                   </div>
                 </div>
                 {caption && <p className="ml-[44px] mt-1 text-[10.5px] font-semibold text-brand-600">{caption}</p>}
+                {!editable && <p className="ml-[44px] mt-1 text-[10.5px] text-gray-400">แก้ไขได้เฉพาะเจ้าของร้านเท่านั้น</p>}
               </div>
             );
           })}

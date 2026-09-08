@@ -139,6 +139,9 @@ export function EditDayModal({
         }
       }
       onClose();
+    } catch (err) {
+      console.error(err);
+      window.alert('บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setSaving(false);
     }
@@ -255,7 +258,9 @@ export function EditDayModal({
                           className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-[12px] text-gray-700 outline-none"
                         >
                           <option value="">เลือกพนักงาน...</option>
-                          {employees.filter((e2) => e2.id !== emp.id).map((e2) => (
+                          {employees
+                            .filter((e2) => e2.id !== emp.id && canEditRow(e2))
+                            .map((e2) => (
                             <option key={e2.id} value={e2.id}>
                               {e2.name} ({e2.nickname})
                             </option>

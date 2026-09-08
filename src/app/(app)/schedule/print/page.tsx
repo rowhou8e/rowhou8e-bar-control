@@ -128,6 +128,13 @@ export default function SchedulePrintPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '6px' }}>
           {weeks.flat().map((cell, idx) => {
             if (!cell.inMonth || !cell.dateStr) {
+              // โชว์ชื่อคนหยุดของเดือนก่อน/ถัดไปแบบจางๆ ด้วย ให้เห็นว่าใครหยุดต่อเนื่องข้ามรอยต่อเดือน
+              const overflowOffList = cell.dateStr
+                ? employeesOffOnDate(cell.dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries)
+                : [];
+              const overflowNames = overflowOffList
+                .map(({ employee: e }) => (e.role === 'staff' ? e.nickname : `${e.nickname} (${roleAbbrev(e.role)})`))
+                .join(', ');
               return (
                 <div
                   key={idx}
@@ -137,9 +144,13 @@ export default function SchedulePrintPage() {
                     minHeight: '78px',
                     padding: '5px 7px',
                     background: '#FAFAFA',
+                    overflow: 'hidden',
                   }}
                 >
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#D1D5DB' }}>{cell.date?.getDate()}</span>
+                  {overflowNames && (
+                    <p style={{ margin: '3px 0 0', fontSize: '9px', color: '#D1D5DB', lineHeight: 1.5 }}>หยุด: {overflowNames}</p>
+                  )}
                 </div>
               );
             }

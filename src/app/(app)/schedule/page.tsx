@@ -164,9 +164,19 @@ export default function SchedulePage() {
           <div className="grid grid-cols-7 gap-1">
             {weeks.flat().map((cell, idx) => {
               if (!cell.inMonth || !cell.dateStr) {
+                // โชว์ชื่อเล่นคนหยุดของเดือนก่อน/ถัดไปแบบจางๆ ด้วย (เฉพาะเจ้าของ/ผู้จัดการ) ให้เห็นเผื่อวางแผนรอยต่อเดือน
+                const overflowOffList =
+                  canManage && cell.dateStr
+                    ? employeesOffOnDate(cell.dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries)
+                    : [];
                 return (
-                  <div key={idx} className="min-h-[58px] rounded-[10px] p-1 opacity-40">
+                  <div key={idx} className="min-h-[58px] overflow-hidden rounded-[10px] p-1 opacity-40">
                     <span className="text-[11px] font-semibold text-gray-400">{cell.date?.getDate()}</span>
+                    {overflowOffList.length > 0 && (
+                      <p className="mt-0.5 line-clamp-2 text-[7px] font-medium leading-tight text-gray-400">
+                        {overflowOffList.map((o) => o.employee.nickname).join(', ')}
+                      </p>
+                    )}
                   </div>
                 );
               }

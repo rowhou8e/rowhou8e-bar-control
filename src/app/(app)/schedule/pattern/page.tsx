@@ -83,7 +83,7 @@ export default function WeeklyPatternSettingsPage() {
                     {initials(emp)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-bold text-gray-900">{emp.nickname}</p>
+                    <p className="truncate text-[13.5px] font-bold text-gray-900">{emp.name} <span className="font-normal text-gray-400">({emp.nickname})</span></p>
                     <p className="text-[10.5px] text-gray-400">{roleLabel(emp.role)}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">

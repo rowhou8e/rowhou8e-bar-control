@@ -138,7 +138,7 @@ export default function SchedulePrintPage() {
               const badges = specialDaysForDate(dateStr, specialDays);
               const offList = employeesOffOnDate(dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries);
               const names = offList
-                .map(({ employee: e }) => (e.role === 'staff' ? e.nickname : `${e.nickname} (${roleAbbrev(e.role)})`))
+                .map(({ employee: e }) => (e.role === 'staff' ? e.name : `${e.name} (${roleAbbrev(e.role)})`))
                 .join(', ');
 
               return (

@@ -199,7 +199,7 @@ export function EditDayModal({
                     {initials(emp)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-gray-900">{emp.nickname}</p>
+                    <p className="truncate text-sm font-bold text-gray-900">{emp.name} <span className="font-normal text-gray-400">({emp.nickname})</span></p>
                     <p className="text-[11.5px] text-gray-400">
                       {emp.role === 'owner' ? 'เจ้าของ' : emp.role === 'manager' ? 'ผู้จัดการ' : 'พนักงาน'}
                     </p>
@@ -257,7 +257,7 @@ export function EditDayModal({
                           <option value="">เลือกพนักงาน...</option>
                           {employees.filter((e2) => e2.id !== emp.id).map((e2) => (
                             <option key={e2.id} value={e2.id}>
-                              {e2.nickname}
+                              {e2.name} ({e2.nickname})
                             </option>
                           ))}
                         </select>

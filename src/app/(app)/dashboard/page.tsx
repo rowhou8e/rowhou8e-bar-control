@@ -91,7 +91,7 @@ export default function DashboardPage() {
   return (
     <div>
       <Header
-        title={`สวัสดี ${employee?.nickname ?? ''} 👋`}
+        title={`สวัสดี ${employee?.name ?? ''} (${employee?.nickname ?? ''}) 👋`}
         subtitle={`${roleLabel(employee?.role ?? 'staff')} · วันนี้ ${new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long' })}`}
         currentEmployee={employee}
       />

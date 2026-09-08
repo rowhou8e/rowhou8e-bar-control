@@ -213,7 +213,7 @@ export default function SchedulePage() {
                               ? { border: `1.3px dashed ${e.avatarColor}`, color: e.avatarColor, backgroundColor: 'transparent' }
                               : { backgroundColor: e.avatarColor, color: '#fff' }
                           }
-                          title={e.nickname}
+                          title={`${e.name} (${e.nickname})`}
                         >
                           {initials(e)}
                         </span>

@@ -1639,6 +1639,27 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
   });
 }
 
+/**
+ * เจ้าของร้านดูอีเมลที่พนักงานแต่ละคนใช้ล็อกอิน — ต้องผ่าน API route ฝั่งเซิร์ฟเวอร์เท่านั้น
+ * เพราะอีเมลของบัญชี Supabase Auth คนอื่นอ่านได้เฉพาะด้วย service role key (ห้ามอยู่ฝั่ง client)
+ */
+export async function fetchEmployeeEmails(): Promise<Record<string, string>> {
+  const sb = getSupabaseClient();
+  const { data: sessionData } = await sb.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+
+  const res = await fetch('/api/employees/list-emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.error ?? 'ดึงอีเมลพนักงานไม่สำเร็จ');
+  }
+  return json?.emails ?? {};
+}
+
 // ================= EMPLOYEES (แก้ไข) =================
 export async function updateEmployee(
   id: string,

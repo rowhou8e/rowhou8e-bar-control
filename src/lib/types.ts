@@ -554,6 +554,12 @@ export interface AppStore {
    * เพราะต้องใช้ service role key แก้ไขบัญชี Supabase Auth ของคนอื่น
    */
   resetEmployeePassword(employeeId: string, newPassword: string, actorId: string): void | Promise<void>;
+  /**
+   * เจ้าของร้านดูอีเมลที่พนักงานแต่ละคนใช้ล็อกอิน — ใช้ได้จริงเฉพาะโหมด Supabase เท่านั้น
+   * (โหมด mock ไม่มีอีเมลจริง คืนค่าว่างเสมอ) ทำผ่าน API route ฝั่งเซิร์ฟเวอร์เพราะต้องใช้ service role key
+   * อ่านอีเมลจากบัญชี Supabase Auth ของคนอื่น — คืนค่าเป็น map employeeId -> email
+   */
+  fetchEmployeeEmails(): Record<string, string> | Promise<Record<string, string>>;
 
   // ================= วันหยุดร้าน (owner/manager เท่านั้น) — เฟส 4 =================
   addStoreHoliday(input: { date: string; label: string; actorId: string }): void | Promise<void>;

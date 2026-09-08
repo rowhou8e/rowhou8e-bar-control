@@ -559,6 +559,11 @@ class Store {
     });
   }
 
+  /** โหมด mock ไม่มีบัญชี Supabase Auth จริง ไม่มีอีเมลให้ดู — คืนค่าว่างเสมอ */
+  fetchEmployeeEmails(): Record<string, string> {
+    return {};
+  }
+
   // ================= จัดการรายการวัตถุดิบ =================
   createStockItem(input: {
     name: string;

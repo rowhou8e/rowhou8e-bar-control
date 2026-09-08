@@ -661,6 +661,11 @@ export class LiveStore {
     await q.resetEmployeePassword(employeeId, newPassword, actorId);
   }
 
+  /** เจ้าของร้านดูอีเมลที่พนักงานแต่ละคนใช้ล็อกอิน — ผ่าน API route ฝั่งเซิร์ฟเวอร์ (ดู queries.ts) */
+  async fetchEmployeeEmails() {
+    return q.fetchEmployeeEmails();
+  }
+
   // ================= จัดการรายการวัตถุดิบ =================
   async createStockItem(input: {
     name: string;

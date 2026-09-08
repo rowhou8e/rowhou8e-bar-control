@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { store } from '@/lib/store';
@@ -53,6 +53,15 @@ export default function SettingsPage() {
 
   const isOwner = employee?.role === 'owner';
   const canManageCatalog = employee?.role === 'owner' || employee?.role === 'manager';
+
+  // เจ้าของร้านเท่านั้นที่เห็นอีเมลเข้าสู่ระบบของพนักงานแต่ละคน (โหมด mock คืนค่าว่างเสมอ)
+  const [employeeEmails, setEmployeeEmails] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!isOwner) return;
+    Promise.resolve(store.fetchEmployeeEmails())
+      .then((emails) => setEmployeeEmails(emails ?? {}))
+      .catch(() => {});
+  }, [isOwner]);
 
   if (employee && !canManageCatalog) {
     return (
@@ -388,6 +397,11 @@ export default function SettingsPage() {
                         ? `${formatThaiDateTime(emp.lastLoginAt)}${emp.lastLoginDevice ? ` · ${emp.lastLoginDevice}` : ''}`
                         : 'ยังไม่เคยล็อกอิน'}
                     </p>
+                    {isOwner && (
+                      <p className="mt-0.5 text-[11px] text-gray-400">
+                        อีเมลเข้าสู่ระบบ: {employeeEmails[emp.id] ?? '—'}
+                      </p>
+                    )}
 
                     {isMockMode && emp.id !== employee?.id && (
                       <div className="mt-1.5">

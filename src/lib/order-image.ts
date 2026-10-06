@@ -7,7 +7,6 @@ import { formatThaiDate, formatThaiDateTime, getEmployeeName, hexToRgba, supplie
  * วาดด้วย Canvas 2D ล้วน ๆ ไม่พึ่ง library ภายนอก (เลี่ยงปัญหาติดตั้ง dependency)
  */
 
-const BRAND = '#141414';
 const BRAND_DARK = '#000000';
 const TEXT_DARK = '#0A0A0A';
 const TEXT_GRAY = '#454545';
@@ -45,6 +44,53 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines.length > 0 ? lines : [''];
 }
 
+/** แปลง hex เป็น [r,g,b] 0-255 — ใช้คำนวณความสว่างของสีประจำผู้ขายก่อนเลือกสีพื้นหลังแถบบน */
+function hexToRgbTuple(hex: string): [number, number, number] {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  const num = parseInt(h, 16);
+  if (Number.isNaN(num)) return [20, 20, 20];
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function srgbChannelToLinear(c: number): number {
+  const s = c / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+/** ความสว่างสัมพัทธ์ตามสูตร WCAG — ใช้ตัดสินว่าตัวอักษรสีขาวทับสีนี้จะอ่านง่ายพอหรือไม่ */
+function relativeLuminance([r, g, b]: [number, number, number]): number {
+  return 0.2126 * srgbChannelToLinear(r) + 0.7152 * srgbChannelToLinear(g) + 0.0722 * srgbChannelToLinear(b);
+}
+
+function mixWithBlack([r, g, b]: [number, number, number], amount: number): [number, number, number] {
+  const a = Math.min(1, Math.max(0, amount));
+  return [r * (1 - a), g * (1 - a), b * (1 - a)];
+}
+
+function rgbTupleToHex([r, g, b]: [number, number, number]): string {
+  const toHex = (n: number) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/**
+ * คำนวณสีพื้นหลัง "แถบบน" ของใบสั่งซื้อจากสีประจำผู้ขาย — ให้เห็นสีผู้ขายเด่นชัดตั้งแต่บรรทัดแรก
+ * สีที่เข้ม/อิ่มตัวอยู่แล้ว (แดง ม่วง น้ำเงิน น้ำตาล ฯลฯ) ใช้แทบเต็มสีได้เลย ส่วนสีสว่าง (เหลือง เขียวอมฟ้า)
+ * จะไล่ผสมเข้มขึ้นทีละน้อยจนกว่าตัวอักษรสีขาวที่พิมพ์ทับจะยังอ่านง่าย (คอนทราสต์ >= 4.5:1 ตามเกณฑ์ WCAG)
+ */
+function headerFillFor(accentHex: string): string {
+  const rgb = hexToRgbTuple(accentHex);
+  const targetLuminance = 0.16; // เผื่อระยะให้คอนทราสต์กับตัวอักษรขาวเกิน 4.5:1 สบาย ๆ
+  if (relativeLuminance(rgb) <= targetLuminance) return accentHex;
+  let amount = 0;
+  let mixed = rgb;
+  while (amount < 0.82 && relativeLuminance(mixed) > targetLuminance) {
+    amount += 0.02;
+    mixed = mixWithBlack(rgb, amount);
+  }
+  return rgbTupleToHex(mixed);
+}
+
 async function ensureFontsLoaded(): Promise<void> {
   if (typeof document === 'undefined' || !('fonts' in document)) return;
   try {
@@ -70,6 +116,10 @@ async function renderPurchaseOrderImageBlob(
   if (typeof document === 'undefined') return null;
   await ensureFontsLoaded();
 
+  // สีประจำผู้ขาย — ใช้ไล่สีแถบบน/การ์ดข้อมูลผู้ขาย/หัวตาราง ให้ตรงกับหน้าจออื่น ๆ ในระบบ
+  const accent = supplierColor(supplier);
+  const headerFill = headerFillFor(accent);
+
   const W = 800;
   const marginX = 40;
   const contentW = W - marginX * 2;
@@ -87,8 +137,6 @@ async function renderPurchaseOrderImageBlob(
   const tableY = supplierY + supplierH + 20;
   const tableHeaderH = 40;
 
-  // สีประจำผู้ขาย — ใช้ไล่สีแถบ/การ์ดข้อมูลผู้ขายและหัวตาราง ให้ตรงกับหน้าจออื่น ๆ ในระบบ
-  const accent = supplierColor(supplier);
   const accentCardY = supplierY - 12;
   const accentCardH = supplierH + 26;
   const accentTextX = marginX + 16;
@@ -159,9 +207,12 @@ async function renderPurchaseOrderImageBlob(
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, W, H);
 
-  // แถบหัวสีแบรนด์
-  ctx.fillStyle = BRAND;
+  // แถบหัว — ไล่สีตามผู้ขายให้เด่นชัดตั้งแต่บรรทัดแรก (เข้มพอให้ตัวอักษรขาวด้านบนยังอ่านง่าย)
+  ctx.fillStyle = headerFill;
   ctx.fillRect(0, 0, W, headerH);
+  // แถบทึบสีประจำผู้ขาย "เต็มสี" คั่นท้ายส่วนหัว — เผื่อแถบบนถูกผสมเข้มขึ้นจนสีจริงของผู้ขายไม่ชัด ยังมีจุดอ้างอิงสีแท้ให้เทียบ
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, headerH - 6, W, 6);
   ctx.fillStyle = '#FFFFFF';
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
@@ -179,15 +230,15 @@ async function renderPurchaseOrderImageBlob(
   ctx.fillText(STATUS_LABEL[po.status] ?? po.status, W - marginX, 100);
   ctx.textAlign = 'left';
 
-  // กล่องข้อมูลผู้ขาย — ไล่สีตามผู้ขาย (พื้นหลังอ่อน + แถบซ้ายทึบ) ให้ตรงกับการ์ดบนหน้าจอ
-  ctx.fillStyle = hexToRgba(accent, 0.07);
+  // กล่องข้อมูลผู้ขาย — ไล่สีตามผู้ขาย (พื้นหลังอ่อน + แถบซ้ายทึบ) ให้ตรงกับการ์ดบนหน้าจอ — เพิ่มความเข้ม/ความหนาให้เด่นขึ้น
+  ctx.fillStyle = hexToRgba(accent, 0.12);
   ctx.fillRect(marginX - 14, accentCardY, contentW + 28, accentCardH);
   ctx.fillStyle = accent;
-  ctx.fillRect(marginX - 14, accentCardY, 5, accentCardH);
+  ctx.fillRect(marginX - 14, accentCardY, 7, accentCardH);
 
   ctx.fillStyle = accent;
   ctx.beginPath();
-  ctx.arc(marginX + 5, supplierY + 13, 5, 0, Math.PI * 2);
+  ctx.arc(marginX + 7, supplierY + 13, 6, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = TEXT_DARK;
@@ -210,10 +261,10 @@ async function renderPurchaseOrderImageBlob(
   }
 
   // หัวตาราง — ไล่สีอ่อนตามผู้ขายเช่นกัน พร้อมเส้นใต้สีทึบให้เห็นชัดเวลาพิมพ์/ย่อขนาด
-  ctx.fillStyle = hexToRgba(accent, 0.14);
+  ctx.fillStyle = hexToRgba(accent, 0.20);
   ctx.fillRect(marginX, tableY, contentW, tableHeaderH);
   ctx.fillStyle = accent;
-  ctx.fillRect(marginX, tableY + tableHeaderH - 2, contentW, 2);
+  ctx.fillRect(marginX, tableY + tableHeaderH - 3, contentW, 3);
   ctx.fillStyle = BRAND_DARK;
   ctx.font = `700 15px ${FONT_FAMILY}`;
   ctx.textBaseline = 'middle';

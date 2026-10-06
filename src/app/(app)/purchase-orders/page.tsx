@@ -6,7 +6,7 @@ import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { Header } from '@/components/Header';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
 import { EmptyState, PrimaryButton, SecondaryButton } from '@/components/ui';
-import { formatThaiDate } from '@/lib/derive';
+import { formatThaiDate, hexToRgba, supplierColor } from '@/lib/derive';
 import type { PurchaseOrderStatus } from '@/lib/types';
 
 const TABS: { value: PurchaseOrderStatus | 'all'; label: string }[] = [
@@ -66,15 +66,20 @@ export default function PurchaseOrdersPage() {
             {filtered.map((po) => {
               const supplier = suppliers.find((s) => s.id === po.supplierId);
               const total = po.items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
+              const color = supplierColor(supplier);
               return (
                 <button
                   key={po.id}
                   onClick={() => router.push(`/purchase-orders/${po.id}`)}
-                  className="block w-full rounded-2xl bg-white p-4 text-left shadow-card active:bg-gray-50"
+                  className="block w-full rounded-2xl border-l-4 bg-white p-4 text-left shadow-card active:bg-gray-50"
+                  style={{ borderLeftColor: color, backgroundColor: hexToRgba(color, 0.05) }}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-gray-900">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                        <p className="truncate text-sm font-bold text-gray-900">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
+                      </div>
                       <p className="mt-0.5 text-xs text-gray-500">
                         {formatThaiDate(po.orderDate)} · {po.items.length} รายการ
                       </p>

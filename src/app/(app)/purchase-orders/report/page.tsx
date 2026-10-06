@@ -6,7 +6,7 @@ import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { Header } from '@/components/Header';
 import { EmptyState, SecondaryButton } from '@/components/ui';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
-import { formatThaiDate, formatThaiDateTime, formatThaiMonthYear, getEmployeeName } from '@/lib/derive';
+import { formatThaiDate, formatThaiDateTime, formatThaiMonthYear, getEmployeeName, hexToRgba, supplierColor } from '@/lib/derive';
 import type { Employee, PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 
 function currentMonth() {
@@ -40,6 +40,8 @@ type BreakdownRow = {
   quantityByUnit: Record<string, number> | null;
   orderCount: number;
   amount: number;
+  /** สีประจำผู้ขาย — ตั้งเฉพาะมุมมอง "ตามผู้ขาย" เพื่อให้แถบสีตรงกับหน้าสั่งซื้อ/ใบสั่งซื้อ */
+  color?: string;
 };
 
 export default function PurchaseReportPage() {
@@ -80,6 +82,10 @@ export default function PurchaseReportPage() {
     return suppliers.find((s) => s.id === id)?.name ?? 'ไม่ระบุผู้ขาย';
   }
 
+  function supplierColorById(id: string) {
+    return supplierColor(suppliers.find((s) => s.id === id) ?? null);
+  }
+
   const supplierRows: BreakdownRow[] = useMemo(() => {
     const map = new Map<string, BreakdownRow>();
     for (const po of monthOrders) {
@@ -90,7 +96,14 @@ export default function PurchaseReportPage() {
         existing.amount += amount;
         existing.orderCount += 1;
       } else {
-        map.set(key, { key, label: supplierName(key), quantityByUnit: null, orderCount: 1, amount });
+        map.set(key, {
+          key,
+          label: supplierName(key),
+          quantityByUnit: null,
+          orderCount: 1,
+          amount,
+          color: supplierColorById(key),
+        });
       }
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
@@ -227,7 +240,13 @@ export default function PurchaseReportPage() {
               className={view === 'item' ? '' : 'hidden print:block'}
             />
 
-            <OrderDetailTable orders={monthOrders} supplierName={supplierName} employees={employees} total={total} />
+            <OrderDetailTable
+              orders={monthOrders}
+              supplierName={supplierName}
+              supplierColorById={supplierColorById}
+              employees={employees}
+              total={total}
+            />
 
             <SecondaryButton onClick={handlePrint} className="no-print">
               ปริ้นรายงาน
@@ -298,9 +317,18 @@ function BreakdownTable({
       <p className="mb-2 text-sm font-bold text-gray-800">{title}</p>
       <div className="space-y-2">
         {rows.map((r) => (
-          <div key={r.key} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs last:border-0 last:pb-0">
+          <div
+            key={r.key}
+            className={`flex items-center justify-between border-b border-gray-50 py-1.5 pr-1 text-xs last:border-0 ${
+              r.color ? 'border-l-4 pl-2' : ''
+            }`}
+            style={r.color ? { borderLeftColor: r.color, backgroundColor: hexToRgba(r.color, 0.05) } : undefined}
+          >
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-gray-800">{r.label}</p>
+              <div className="flex items-center gap-1.5">
+                {r.color && <span className="h-2 w-2 shrink-0 rounded-full print:hidden" style={{ backgroundColor: r.color }} />}
+                <p className="truncate font-semibold text-gray-800">{r.label}</p>
+              </div>
               <p className="text-gray-400">
                 {r.quantityByUnit &&
                   `${Object.entries(r.quantityByUnit)
@@ -325,11 +353,13 @@ function BreakdownTable({
 function OrderDetailTable({
   orders,
   supplierName,
+  supplierColorById,
   employees,
   total,
 }: {
   orders: PurchaseOrder[];
   supplierName: (id: string) => string;
+  supplierColorById: (id: string) => string;
   employees: Employee[];
   total: number;
 }) {
@@ -353,7 +383,15 @@ function OrderDetailTable({
             {orders.map((po) => (
               <tr key={po.id} className="border-b border-gray-50 last:border-0">
                 <td className="whitespace-nowrap py-1.5 pr-2 text-gray-700">{formatThaiDate(po.orderDate)}</td>
-                <td className="py-1.5 pr-2 text-gray-700">{supplierName(po.supplierId)}</td>
+                <td className="py-1.5 pr-2 text-gray-700">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full print:hidden"
+                      style={{ backgroundColor: supplierColorById(po.supplierId) }}
+                    />
+                    {supplierName(po.supplierId)}
+                  </span>
+                </td>
                 <td className="py-1.5 pr-2">
                   <span className="print:hidden">
                     <PurchaseOrderStatusBadge status={po.status} />

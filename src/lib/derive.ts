@@ -20,6 +20,7 @@ import type {
   Station,
   StockItem,
   StoreHoliday,
+  Supplier,
   SupplierItemPrice,
 } from './types';
 
@@ -392,4 +393,54 @@ export function getEmployeeName(employees: Employee[], id: string | null): strin
 
 export function roleLabel(role: string): string {
   return { owner: 'เจ้าของร้าน', manager: 'ผู้จัดการ', staff: 'พนักงาน' }[role] ?? role;
+}
+
+/**
+ * ชุดสีเริ่มต้นสำหรับแยกผู้ขายแต่ละราย — ให้เลือกเองได้จากชุดนี้ที่หน้าตั้งค่า (หรือเลือกสีอื่นเองก็ได้ผ่าน color picker)
+ * เรียงให้สีที่อยู่ติดกันแตกต่างกันชัดเจน อ่านง่ายทั้งเป็นจุด/แถบ/พื้นหลังโทนอ่อน
+ */
+export const SUPPLIER_COLOR_PRESETS = [
+  '#ef4444', // แดง
+  '#f97316', // ส้ม
+  '#f59e0b', // เหลือง/อำพัน
+  '#84cc16', // เขียวมะนาว
+  '#10b981', // เขียวมรกต
+  '#14b8a6', // เขียวอมฟ้า
+  '#06b6d4', // ฟ้า
+  '#3b82f6', // น้ำเงิน
+  '#6366f1', // คราม
+  '#8b5cf6', // ม่วง
+  '#d946ef', // บานเย็น
+  '#ec4899', // ชมพู
+];
+
+/** สีเทากลางๆ สำหรับกรณีไม่ระบุผู้ขาย */
+export const SUPPLIER_NO_COLOR = '#9ca3af';
+
+/**
+ * สีประจำผู้ขาย — ถ้าเจ้าของร้าน/ผู้จัดการตั้งสีเองไว้ที่หน้าตั้งค่าแล้วใช้สีนั้น
+ * ถ้ายังไม่ได้ตั้ง จะสุ่มสีจากชุดพรีเซ็ตให้อัตโนมัติแบบ "คงที่" ตาม id ของผู้ขาย (รีเฟรชหน้าแล้วยังได้สีเดิม)
+ */
+export function supplierColor(supplier: Pick<Supplier, 'id' | 'color'> | null | undefined): string {
+  if (!supplier) return SUPPLIER_NO_COLOR;
+  if (supplier.color) return supplier.color;
+  let hash = 0;
+  for (let i = 0; i < supplier.id.length; i++) {
+    hash = (hash * 31 + supplier.id.charCodeAt(i)) >>> 0;
+  }
+  return SUPPLIER_COLOR_PRESETS[hash % SUPPLIER_COLOR_PRESETS.length];
+}
+
+/** แปลงสี hex (#rgb หรือ #rrggbb) เป็น rgba สำหรับทำพื้นหลังโทนอ่อนๆ ของแถบ/คอลัมน์ผู้ขาย */
+export function hexToRgba(hex: string, alpha: number): string {
+  let h = hex.replace('#', '');
+  if (h.length === 3) {
+    h = h.split('').map((c) => c + c).join('');
+  }
+  const num = parseInt(h, 16);
+  if (Number.isNaN(num)) return `rgba(156, 163, 175, ${alpha})`; // fallback เทา
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

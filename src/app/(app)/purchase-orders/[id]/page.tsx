@@ -7,7 +7,7 @@ import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/ui';
-import { formatThaiDate, formatThaiDateTime, getEmployeeName, latestSupplierPricesForItem } from '@/lib/derive';
+import { formatThaiDate, formatThaiDateTime, getEmployeeName, hexToRgba, latestSupplierPricesForItem, supplierColor } from '@/lib/derive';
 import { downloadPurchaseOrderImage, sharePurchaseOrderImage } from '@/lib/order-image';
 import type { PurchaseOrderStatus } from '@/lib/types';
 
@@ -145,9 +145,15 @@ export default function PurchaseOrderDetailPage() {
     <div>
       <Header title={supplier?.name ?? 'ใบสั่งซื้อ'} subtitle={formatThaiDate(po.orderDate)} currentEmployee={employee} onBack={() => router.back()} />
       <main className="space-y-4 px-4 py-4">
-        <div className="rounded-2xl bg-white p-4 shadow-card">
+        <div
+          className="rounded-2xl border-l-4 bg-white p-4 shadow-card"
+          style={{ borderLeftColor: supplierColor(supplier), backgroundColor: hexToRgba(supplierColor(supplier), 0.05) }}
+        >
           <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-gray-900">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: supplierColor(supplier) }} />
+              <p className="truncate text-sm font-bold text-gray-900">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
+            </div>
             <PurchaseOrderStatusBadge status={po.status} />
           </div>
           {(supplier?.contactPerson || supplier?.phone) && (

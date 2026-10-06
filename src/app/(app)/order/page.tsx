@@ -6,7 +6,7 @@ import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { EmptyState, PrimaryButton } from '@/components/ui';
-import { latestSupplierPricesForItem, toDateStr } from '@/lib/derive';
+import { hexToRgba, latestSupplierPricesForItem, supplierColor, toDateStr } from '@/lib/derive';
 import type { StockItem } from '@/lib/types';
 
 /**
@@ -564,6 +564,7 @@ export default function OrderPage() {
                 {suppliersWithItems.map((s) => {
                   const isActive = s.id === currentSupplierId;
                   const selectedCount = selectedCountForSupplier(s.id);
+                  const color = supplierColor(s);
                   return (
                     <button
                       key={s.id}
@@ -572,11 +573,17 @@ export default function OrderPage() {
                         setCategoryFilter('all');
                         setQuery('');
                       }}
-                      className={`shrink-0 rounded-xl border px-3 py-2 text-left ${
-                        isActive ? 'border-brand-600 bg-brand-50' : 'border-gray-200 bg-white'
-                      }`}
+                      className="shrink-0 rounded-xl border-y border-r py-2 pl-2.5 pr-3 text-left"
+                      style={{
+                        borderLeftWidth: 4,
+                        borderLeftColor: color,
+                        borderTopColor: isActive ? color : '#e5e7eb',
+                        borderRightColor: isActive ? color : '#e5e7eb',
+                        borderBottomColor: isActive ? color : '#e5e7eb',
+                        backgroundColor: isActive ? hexToRgba(color, 0.1) : '#fff',
+                      }}
                     >
-                      <p className={`text-xs font-bold ${isActive ? 'text-brand-700' : 'text-gray-700'}`}>{s.name}</p>
+                      <p className="text-xs font-bold text-gray-800">{s.name}</p>
                       <p className="mt-0.5 text-[10px] text-gray-400">
                         {orderableItems.filter((it) => it.supplierId === s.id).length} รายการ
                         {selectedCount > 0 && <span className="ml-1 font-bold text-brand-600">· เลือกแล้ว {selectedCount}</span>}
@@ -772,11 +779,19 @@ export default function OrderPage() {
               const items = groupList.find(([id]) => id === supplierId)?.[1] ?? [];
               const expenses = customItems.filter((c) => c.supplierId === supplierId);
               const total = groupTotal(items) + customTotalForSupplier(supplierId);
+              const color = supplierColor(supplier);
               return (
-                <div key={supplierId} className="rounded-xl bg-gray-50 p-2.5">
+                <div
+                  key={supplierId}
+                  className="rounded-xl border-l-4 p-2.5"
+                  style={{ borderLeftColor: color, backgroundColor: hexToRgba(color, 0.06) }}
+                >
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-gray-800">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
-                    <p className="text-xs font-bold text-gray-700">{total.toLocaleString()} บาท</p>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                      <p className="truncate text-xs font-bold text-gray-800">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
+                    </div>
+                    <p className="shrink-0 text-xs font-bold text-gray-700">{total.toLocaleString()} บาท</p>
                   </div>
                   {items.length > 0 && (
                     <p className="mt-0.5 text-[11px] text-gray-400">

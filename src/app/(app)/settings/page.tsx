@@ -8,7 +8,7 @@ import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { PhotoAttach, PrimaryButton, SectionTitle } from '@/components/ui';
 import { getDataMode } from '@/lib/supabase/client';
-import { formatThaiDate, formatThaiDateTime, roleLabel } from '@/lib/derive';
+import { formatThaiDate, formatThaiDateTime, roleLabel, SUPPLIER_COLOR_PRESETS, supplierColor } from '@/lib/derive';
 import type { ChecklistItemFrequency, ChecklistTemplateItem, Product, Role, Station, StockCategory, StockItem, StoreHoliday, Supplier, SupplierItemPrice } from '@/lib/types';
 
 export default function SettingsPage() {
@@ -1571,6 +1571,7 @@ function SuppliersSection({
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [color, setColor] = useState(SUPPLIER_COLOR_PRESETS[suppliers.length % SUPPLIER_COLOR_PRESETS.length]);
 
   function handleAdd() {
     if (!name.trim()) return;
@@ -1580,12 +1581,14 @@ function SuppliersSection({
       phone: phone.trim(),
       address: address.trim(),
       note: '',
+      color,
       actorId: employeeId,
     });
     setName('');
     setContactPerson('');
     setPhone('');
     setAddress('');
+    setColor(SUPPLIER_COLOR_PRESETS[(suppliers.length + 1) % SUPPLIER_COLOR_PRESETS.length]);
     setShowAdd(false);
   }
 
@@ -1630,6 +1633,7 @@ function SuppliersSection({
               className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
             />
           </div>
+          <SupplierColorPicker value={color} onChange={setColor} />
           <button
             onClick={handleAdd}
             disabled={!name.trim()}
@@ -1656,6 +1660,34 @@ function SuppliersSection({
   );
 }
 
+/** ตัวเลือกสีประจำผู้ขาย — แตะวงกลมเพื่อเลือกจากชุดสีพร้อมใช้ หรือกดไอคอนวงกลมสุดท้ายเพื่อเลือกสีเองแบบอิสระ */
+function SupplierColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+  return (
+    <div>
+      <p className="mb-1 text-[11px] font-semibold text-gray-500">สีประจำผู้ขาย (ใช้แยกแถบสีในหน้าสั่งซื้อ/ใบสั่งซื้อ/รายงาน)</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {SUPPLIER_COLOR_PRESETS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            className="h-6 w-6 shrink-0 rounded-full ring-1 ring-inset ring-black/10"
+            style={{ backgroundColor: c, outline: value === c ? '2px solid #111827' : 'none', outlineOffset: '1px' }}
+            aria-label={`เลือกสี ${c}`}
+          />
+        ))}
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          title="เลือกสีเอง"
+          className="h-6 w-8 shrink-0 cursor-pointer rounded border border-gray-200 bg-transparent p-0"
+        />
+      </div>
+    </div>
+  );
+}
+
 function SupplierBlock({
   supplier,
   prices,
@@ -1674,13 +1706,14 @@ function SupplierBlock({
   const [contactPerson, setContactPerson] = useState(supplier.contactPerson);
   const [phone, setPhone] = useState(supplier.phone);
   const [address, setAddress] = useState(supplier.address);
+  const [color, setColor] = useState(supplierColor(supplier));
   const [showPrices, setShowPrices] = useState(false);
 
   function handleSave() {
     if (!name.trim()) return;
     store.updateSupplier(
       supplier.id,
-      { name: name.trim(), contactPerson: contactPerson.trim(), phone: phone.trim(), address: address.trim() },
+      { name: name.trim(), contactPerson: contactPerson.trim(), phone: phone.trim(), address: address.trim(), color },
       employeeId
     );
     setEditing(false);
@@ -1722,6 +1755,7 @@ function SupplierBlock({
             className="rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none focus:border-brand-400"
           />
         </div>
+        <SupplierColorPicker value={color} onChange={setColor} />
         <div className="flex gap-1.5">
           <button onClick={handleSave} className="flex-1 rounded-md bg-brand-600 px-2 py-1 text-[10px] font-bold text-white">
             บันทึก
@@ -1732,6 +1766,7 @@ function SupplierBlock({
               setContactPerson(supplier.contactPerson);
               setPhone(supplier.phone);
               setAddress(supplier.address);
+              setColor(supplierColor(supplier));
               setEditing(false);
             }}
             className="flex-1 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-500"
@@ -1744,10 +1779,13 @@ function SupplierBlock({
   }
 
   return (
-    <div className="rounded-xl border border-gray-100 p-2.5">
+    <div className="rounded-xl border-l-4 border-y border-r border-gray-100 p-2.5" style={{ borderLeftColor: supplierColor(supplier) }}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-bold text-gray-700">{supplier.name}</p>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: supplierColor(supplier) }} />
+            <p className="truncate text-xs font-bold text-gray-700">{supplier.name}</p>
+          </div>
           {(supplier.contactPerson || supplier.phone) && (
             <p className="truncate text-[11px] text-gray-400">
               {supplier.contactPerson}

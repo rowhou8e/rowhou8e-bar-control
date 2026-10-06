@@ -885,10 +885,19 @@ export async function fetchSuppliers(): Promise<Supplier[]> {
     address: r.address ?? '',
     note: r.note ?? '',
     active: r.active,
+    color: r.color ?? null,
   }));
 }
 
-export async function createSupplier(input: { name: string; contactPerson: string; phone: string; address: string; note: string; actorId: string }) {
+export async function createSupplier(input: {
+  name: string;
+  contactPerson: string;
+  phone: string;
+  address: string;
+  note: string;
+  color?: string | null;
+  actorId: string;
+}) {
   const sb = getSupabaseClient();
   const { data, error } = await sb
     .from('suppliers')
@@ -899,6 +908,7 @@ export async function createSupplier(input: { name: string; contactPerson: strin
       address: input.address,
       note: input.note,
       active: true,
+      color: input.color ?? null,
     })
     .select()
     .single();
@@ -916,7 +926,7 @@ export async function createSupplier(input: { name: string; contactPerson: strin
 
 export async function updateSupplier(
   id: string,
-  patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string },
+  patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string; color?: string | null },
   actorId: string
 ) {
   const sb = getSupabaseClient();
@@ -926,6 +936,7 @@ export async function updateSupplier(
   if (patch.phone !== undefined) dbPatch.phone = patch.phone;
   if (patch.address !== undefined) dbPatch.address = patch.address;
   if (patch.note !== undefined) dbPatch.note = patch.note;
+  if (patch.color !== undefined) dbPatch.color = patch.color;
 
   const { data: before } = await sb.from('suppliers').select('name').eq('id', id).single();
   const { error } = await sb.from('suppliers').update(dbPatch).eq('id', id);

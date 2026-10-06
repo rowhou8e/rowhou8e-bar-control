@@ -197,6 +197,10 @@ create table if not exists public.suppliers (
   active boolean not null default true
 );
 
+-- สีประจำผู้ขาย (hex เช่น #ef4444) — เลือกเองได้ที่หน้าตั้งค่า ใช้แยกแถบสีในหน้าสั่งซื้อ/ใบสั่งซื้อ/รายงาน
+-- ถ้าเป็น null ฝั่งหน้าบ้านจะสุ่มสีให้อัตโนมัติแบบคงที่ตาม id ของผู้ขายเอง
+alter table public.suppliers add column if not exists color text;
+
 -- ผู้ขายที่กำหนดไว้ล่วงหน้าต่อวัตถุดิบแต่ละชิ้น (เจ้าของ/ผู้จัดการกำหนดเองตอนสร้าง/แก้ไขรายการในหน้าตั้งค่า)
 -- พนักงานเลือกผู้ขายเองตอนสั่งสินค้าไม่ได้อีกต่อไป — หน้า "สั่งสินค้า" ใช้ค่านี้โดยตรง (ต้องมาหลัง suppliers เพราะอ้างอิงถึง)
 alter table public.stock_items add column if not exists supplier_id uuid references public.suppliers (id);

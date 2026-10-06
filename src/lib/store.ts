@@ -659,7 +659,15 @@ class Store {
   }
 
   // ================= ผู้ขาย/ซัพพลายเออร์ (Suppliers) =================
-  createSupplier(input: { name: string; contactPerson: string; phone: string; address: string; note: string; actorId: string }) {
+  createSupplier(input: {
+    name: string;
+    contactPerson: string;
+    phone: string;
+    address: string;
+    note: string;
+    color?: string | null;
+    actorId: string;
+  }) {
     this.update((s) => {
       const supplier: Supplier = {
         id: nextId('sup'),
@@ -669,6 +677,7 @@ class Store {
         address: input.address,
         note: input.note,
         active: true,
+        color: input.color ?? null,
       };
       this.log('supplier_change', input.actorId, input.name, `เพิ่มผู้ขายใหม่: ${input.name}`);
       return { ...s, suppliers: [supplier, ...s.suppliers] };
@@ -677,7 +686,7 @@ class Store {
 
   updateSupplier(
     id: string,
-    patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string },
+    patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string; color?: string | null },
     actorId: string
   ) {
     this.update((s) => {

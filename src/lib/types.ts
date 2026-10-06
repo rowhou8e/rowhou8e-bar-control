@@ -201,6 +201,8 @@ export interface Supplier {
   address: string;
   note: string;
   active: boolean;
+  /** สีประจำผู้ขาย (hex เช่น #ef4444) — ใช้แยกแถบสีในหน้าสั่งซื้อ/ใบสั่งซื้อ/รายงาน เลือกเองได้ที่หน้าตั้งค่า ถ้าไม่ได้ตั้งไว้จะสุ่มสีให้อัตโนมัติแบบคงที่ตาม id */
+  color?: string | null;
 }
 
 /**
@@ -625,11 +627,12 @@ export interface AppStore {
     phone: string;
     address: string;
     note: string;
+    color?: string | null;
     actorId: string;
   }): void | Promise<void>;
   updateSupplier(
     id: string,
-    patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string },
+    patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string; color?: string | null },
     actorId: string
   ): void | Promise<void>;
   deleteSupplier(id: string, actorId: string): void | Promise<void>;

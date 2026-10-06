@@ -711,14 +711,22 @@ export class LiveStore {
   }
 
   // ================= ผู้ขาย/ซัพพลายเออร์ (Suppliers) =================
-  async createSupplier(input: { name: string; contactPerson: string; phone: string; address: string; note: string; actorId: string }) {
+  async createSupplier(input: {
+    name: string;
+    contactPerson: string;
+    phone: string;
+    address: string;
+    note: string;
+    color?: string | null;
+    actorId: string;
+  }) {
     await q.createSupplier(input);
     await this.refetchSuppliers();
   }
 
   async updateSupplier(
     id: string,
-    patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string },
+    patch: { name?: string; contactPerson?: string; phone?: string; address?: string; note?: string; color?: string | null },
     actorId: string
   ) {
     await q.updateSupplier(id, patch, actorId);

@@ -1,5 +1,5 @@
 import type { PurchaseOrder, Supplier, Employee, StockItem, StockCategory } from './types';
-import { formatThaiDate, formatThaiDateTime, getEmployeeName } from './derive';
+import { formatThaiDate, formatThaiDateTime, getEmployeeName, hexToRgba, supplierColor } from './derive';
 
 /**
  * สร้างรูปภาพใบสั่งซื้อ (PNG) จากข้อมูลใบสั่งซื้อ เพื่อให้พนักงานกดดาวน์โหลด
@@ -14,7 +14,6 @@ const TEXT_GRAY = '#454545';
 const TEXT_LIGHT_GRAY = '#6E6E6E';
 const BORDER = '#CFCFCF';
 const ROW_ALT = '#F5F5F5';
-const HEADER_BG = '#EBEBEB';
 const TOTAL_BG = '#E0E0E0';
 const CATEGORY_BG = '#D6D6D6';
 
@@ -87,6 +86,12 @@ async function renderPurchaseOrderImageBlob(
   const supplierH = 20 + (hasContactLine ? 24 : 0) + (supplier?.address ? 22 : 0);
   const tableY = supplierY + supplierH + 20;
   const tableHeaderH = 40;
+
+  // สีประจำผู้ขาย — ใช้ไล่สีแถบ/การ์ดข้อมูลผู้ขายและหัวตาราง ให้ตรงกับหน้าจออื่น ๆ ในระบบ
+  const accent = supplierColor(supplier);
+  const accentCardY = supplierY - 12;
+  const accentCardH = supplierH + 26;
+  const accentTextX = marginX + 16;
 
   const col = {
     nameX: marginX,
@@ -174,37 +179,41 @@ async function renderPurchaseOrderImageBlob(
   ctx.fillText(STATUS_LABEL[po.status] ?? po.status, W - marginX, 100);
   ctx.textAlign = 'left';
 
-  // กล่องข้อมูลผู้ขาย
+  // กล่องข้อมูลผู้ขาย — ไล่สีตามผู้ขาย (พื้นหลังอ่อน + แถบซ้ายทึบ) ให้ตรงกับการ์ดบนหน้าจอ
+  ctx.fillStyle = hexToRgba(accent, 0.07);
+  ctx.fillRect(marginX - 14, accentCardY, contentW + 28, accentCardH);
+  ctx.fillStyle = accent;
+  ctx.fillRect(marginX - 14, accentCardY, 5, accentCardH);
+
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(marginX + 5, supplierY + 13, 5, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.fillStyle = TEXT_DARK;
   ctx.font = `700 19px ${FONT_FAMILY}`;
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(supplier?.name ?? 'ไม่ระบุผู้ขาย', marginX, supplierY + 18);
+  ctx.fillText(supplier?.name ?? 'ไม่ระบุผู้ขาย', accentTextX, supplierY + 18);
   let sy = supplierY + 18;
   if (hasContactLine) {
     sy += 24;
     ctx.fillStyle = TEXT_GRAY;
     ctx.font = `400 14px ${FONT_FAMILY}`;
     const parts = [supplier?.contactPerson, supplier?.phone].filter(Boolean);
-    ctx.fillText(parts.join(' · '), marginX, sy);
+    ctx.fillText(parts.join(' · '), accentTextX, sy);
   }
   if (supplier?.address) {
     sy += 22;
     ctx.fillStyle = TEXT_GRAY;
     ctx.font = `400 13px ${FONT_FAMILY}`;
-    ctx.fillText(supplier.address, marginX, sy);
+    ctx.fillText(supplier.address, accentTextX, sy);
   }
 
-  // เส้นคั่น
-  ctx.strokeStyle = BORDER;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(marginX, supplierY + supplierH + 4);
-  ctx.lineTo(W - marginX, supplierY + supplierH + 4);
-  ctx.stroke();
-
-  // หัวตาราง
-  ctx.fillStyle = HEADER_BG;
+  // หัวตาราง — ไล่สีอ่อนตามผู้ขายเช่นกัน พร้อมเส้นใต้สีทึบให้เห็นชัดเวลาพิมพ์/ย่อขนาด
+  ctx.fillStyle = hexToRgba(accent, 0.14);
   ctx.fillRect(marginX, tableY, contentW, tableHeaderH);
+  ctx.fillStyle = accent;
+  ctx.fillRect(marginX, tableY + tableHeaderH - 2, contentW, 2);
   ctx.fillStyle = BRAND_DARK;
   ctx.font = `700 15px ${FONT_FAMILY}`;
   ctx.textBaseline = 'middle';

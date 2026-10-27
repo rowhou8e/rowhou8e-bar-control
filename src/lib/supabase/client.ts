@@ -12,6 +12,30 @@ export function isSupabaseConfigured(): boolean {
 }
 
 /**
+ * ต้นตอตัวจริงของบั๊ก "ใบสั่งซื้อโชว์ 0 รายการ" ที่ไล่แก้กันมาหลายรอบ (optimistic update,
+ * atomic RPC, guard กันค่าว่างผิดปกติ ฯลฯ — ทุกอันช่วยบรรเทาแต่ไม่ได้แก้ที่ต้นตอ):
+ *
+ * PostgREST (REST API ของ Supabase) ไม่ได้ส่ง header `Cache-Control: no-store` กลับมาด้วย
+ * ทุกครั้ง supabase-js เรียก fetch() แบบ GET ธรรมดา (ไม่ได้สั่ง cache: 'no-store' เอง) เบราว์เซอร์
+ * จึงมีสิทธิ์ "แคช" คำตอบไว้ตาม URL เป๊ะๆ ได้ (แคชแบบ private ของเบราว์เซอร์ทำกับ request ที่มี
+ * Authorization header ได้ปกติ ไม่เหมือนแคชแบบ shared/proxy) — ปัญหาคือ fetchPurchaseOrders()
+ * ดึงรายการสินค้าด้วย `.in('purchase_order_id', orderIds)` ซึ่ง URL จะ "เหมือนเดิมทุกตัวอักษร"
+ * ทุกครั้งที่ orderIds ชุดเดียวกัน (เช่น เพิ่ม/ลบแค่ "รายการสินค้าในใบสั่งซื้อเดิม" โดยไม่ได้สร้าง/ลบ
+ * ใบสั่งซื้อใหม่) พอเบราว์เซอร์เจอ URL เดิมซ้ำ จะคืนคำตอบเก่าที่แคชไว้ (ก่อนรายการจะถูกเพิ่ม) แทนที่จะ
+ * ยิง request ใหม่จริงๆ — ยืนยันแล้วด้วยการเทียบข้อมูลจริงในฐานข้อมูล (SQL ตรงๆ เห็น 9 รายการ) กับสิ่งที่
+ * หน้าเว็บโหลดสดๆ ในเบราว์เซอร์จริงเห็น (0 รายการ) ของใบสั่งซื้อเดียวกันในเวลาเดียวกัน — อธิบายได้ครบทุก
+ * อาการที่เจอมา: เห็นถูกต้องตอนเพิ่งบันทึก (optimistic update ไม่ผ่าน fetch), แล้ว "รีเซ็ตเป็น 0 เอง"
+ * ตอนปิดแอป/สลับหน้าแล้วกลับมา (fetch รอบใหม่โดนแคชเก่าทับ), และทำไมใบสั่งซื้อเก่าที่ไม่ได้ถูกแก้ไข
+ * ต่อถึงโชว์ถูกต้องเสมอ (ไม่เคยมีการแก้ไขให้ URL cache เพี้ยน)
+ *
+ * แก้โดยสั่งให้ทุก request ที่ยิงผ่าน client ตัวนี้ (ทั้ง REST และ Auth) ใช้ cache: 'no-store' เสมอ
+ * ผ่าน global.fetch ที่ custom เอง — บังคับให้ยิงเน็ตใหม่จริงทุกครั้ง ไม่มีการอ่านจากแคชเบราว์เซอร์อีก
+ */
+function noStoreFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, { ...init, cache: 'no-store' });
+}
+
+/**
  * สร้าง client แบบ lazy + singleton (สร้างครั้งเดียวแล้วใช้ซ้ำ) เพื่อไม่ให้แอปพังตอน build/dev
  * หากยังไม่ได้ตั้งค่า env และเพื่อให้ auth session / onAuthStateChange listener ทำงานถูกต้อง
  * (ถ้าสร้าง client ใหม่ทุกครั้งที่เรียก จะทำให้ listener หลุดและ session ไม่ sync)
@@ -30,7 +54,9 @@ export function getSupabaseClient(): SupabaseClient<any, any, any> {
     );
   }
   if (!cachedClient) {
-    cachedClient = createClient<any, any, any>(supabaseUrl!, supabaseAnonKey!);
+    cachedClient = createClient<any, any, any>(supabaseUrl!, supabaseAnonKey!, {
+      global: { fetch: noStoreFetch },
+    });
   }
   return cachedClient;
 }

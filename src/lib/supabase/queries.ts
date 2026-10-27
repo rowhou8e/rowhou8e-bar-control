@@ -1020,6 +1020,42 @@ export async function addSupplierItemPrice(input: {
   return data;
 }
 
+/**
+ * ต้นตอตัวจริงของบั๊ก "ใบสั่งซื้อโชว์ 0 รายการ" (ไม่ใช่เรื่อง cache ของเบราว์เซอร์ตามที่เคยสงสัยไว้ —
+ * ทดสอบแล้วด้วย cache: 'no-store' ตรงๆ ก็ยังโดนตัดข้อมูลเหมือนเดิม):
+ *
+ * PostgREST (REST API ของ Supabase) มีค่า default "max-rows" (ปกติ 1000 แถว) สำหรับ query ที่ไม่ได้
+ * ใส่ .range()/pagination เอง — ถ้า query ตัวนั้น "ควรจะ" คืนแถวมากกว่าค่านี้ PostgREST จะตัดให้เหลือ
+ * แค่ชุดแรก (ประมาณ 1000 แถว) โดยไม่ error อะไรเลย และลำดับที่ได้ไม่ deterministic เพราะไม่ได้ระบุ
+ * .order() — fetchPurchaseOrders() เดิมดึง purchase_order_items ของ "ทุกใบสั่งซื้อ" ด้วย
+ * .select('*').in('purchase_order_id', orderIds) ตัวเดียว ไม่มี .range()/.order() เลย พอตาราง
+ * purchase_order_items โตเกิน 1000 แถว (ยืนยันด้วย REST Content-Range header ตรงๆ ว่ามี 1084 แถว
+ * ขณะนี้) รายการของใบสั่งซื้อบางใบ (แบบสุ่มๆ ไม่แน่นอน) จะถูกตัดหายไปจาก response — อธิบายได้ว่าทำไม
+ * ใบที่เพิ่งแก้ไข/ทดสอบล่าสุดถึงมักโชว์ 0 รายการ ขณะที่ใบเก่าๆ โชว์ถูกต้อง (บังเอิญอยู่ในชุดที่ไม่ถูกตัด)
+ * และทำไมถึงเกิดซ้ำได้ทั้งตอน refetch ระหว่างใช้งาน และตอนโหลดหน้าใหม่ทั้งหมด (hydrate ครั้งแรก) —
+ * เพราะทั้งสอง path เรียกฟังก์ชันนี้ตัวเดียวกัน
+ *
+ * แก้โดยดึงแบบแบ่งหน้า (.range()) วนจนกว่าจะได้ครบทุกแถวจริงๆ ไม่ว่าจะมีกี่แถวก็ตาม (รองรับการโตขึ้น
+ * ในอนาคตด้วย ไม่ล็อกไว้แค่ 1084) พร้อมใส่ .order() ให้ผลลัพธ์ deterministic ด้วย
+ */
+async function fetchAllRowsPaginated<T>(
+  queryBuilder: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  pageSize = 1000
+): Promise<T[]> {
+  const allRows: T[] = [];
+  let from = 0;
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await queryBuilder(from, to);
+    if (error) throw error;
+    const page = data ?? [];
+    allRows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return allRows;
+}
+
 // ================= PURCHASE ORDERS (แยกจาก purchase_requests — auto-merge ตามผู้ขาย+วันที่) =================
 export async function fetchPurchaseOrders(): Promise<PurchaseOrder[]> {
   const sb = getSupabaseClient();
@@ -1028,8 +1064,9 @@ export async function fetchPurchaseOrders(): Promise<PurchaseOrder[]> {
   if (!orders || orders.length === 0) return [];
 
   const orderIds = orders.map((o: any) => o.id);
-  const { data: items, error: itemsError } = await sb.from('purchase_order_items').select('*').in('purchase_order_id', orderIds);
-  if (itemsError) throw itemsError;
+  const items = await fetchAllRowsPaginated((from, to) =>
+    sb.from('purchase_order_items').select('*').in('purchase_order_id', orderIds).order('id', { ascending: true }).range(from, to)
+  );
 
   const itemsByOrder = new Map<string, PurchaseOrder['items']>();
   for (const it of items ?? []) {

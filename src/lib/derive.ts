@@ -29,6 +29,12 @@ export const THAI_MONTHS = [
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ];
 
+/** ชื่อเดือนแบบย่อมาตรฐาน — ใช้ที่ label แกน x ของกราฟแนวโน้ม (พื้นที่จำกัด เต็มชื่อเดือนจะไม่พอ) */
+export const THAI_MONTHS_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+];
+
 export function formatThaiDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   const d = new Date(dateStr.length <= 10 ? `${dateStr}T00:00:00` : dateStr);
@@ -452,4 +458,123 @@ export function hexToRgba(hex: string, alpha: number): string {
   const g = (num >> 8) & 255;
   const b = num & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// ================= วิเคราะห์การซื้อ: แนวโน้มหลายเดือน / Top รายการ / ราคาต่อหน่วยที่เปลี่ยนไป =================
+// ใช้ที่หน้า "สรุปการซื้อรายเดือน" โหมด "แนวโน้ม" — ทั้งหมดเป็น pure function คำนวณจาก purchaseOrders ที่โหลดมาแล้ว
+// (ไม่มี query เพิ่ม) จึงต้องเรียกหลังจากที่หน้าจอโหลดประวัติเต็มแล้ว (ดู loadAllPurchaseOrderHistory)
+
+/** คีย์รวมยอดต่อ "รายการสินค้า" — ใช้ stockItemId ถ้าผูกกับสต๊อกไว้ ไม่งั้นอิงชื่อที่พิมพ์เอง (รายการที่เพิ่มเองไม่ผูกสต๊อก)
+ *  ต้องใช้คีย์เดียวกับที่หน้าสรุปรายเดือนมุมมอง "ตามรายการสินค้า" ใช้อยู่แล้ว เพื่อให้นับรวมรายการเดียวกันถูกต้อง */
+function purchaseOrderItemKey(it: { stockItemId: string | null; itemName: string }): string {
+  return it.stockItemId ?? `name:${it.itemName}`;
+}
+
+function purchaseOrderTotal(po: PurchaseOrder): number {
+  return po.items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
+}
+
+export type MonthlySpendPoint = { month: string; total: number; orderCount: number };
+
+/**
+ * สรุปยอดซื้อรวมต่อเดือน ย้อนหลัง monthsBack เดือนนับจาก endMonth (รวมเดือนนั้นด้วย เรียงเก่า→ใหม่)
+ * ไม่รวมใบที่ถูกยกเลิก — endMonth เป็น key รูปแบบ "YYYY-MM"
+ */
+export function monthlySpendSeries(orders: PurchaseOrder[], endMonth: string, monthsBack: number): MonthlySpendPoint[] {
+  const [endY, endM] = endMonth.split('-').map(Number);
+  const points: MonthlySpendPoint[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(endY, endM - 1 - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const monthOrders = orders.filter((po) => po.orderDate.startsWith(key) && po.status !== 'cancelled');
+    points.push({ month: key, total: monthOrders.reduce((sum, po) => sum + purchaseOrderTotal(po), 0), orderCount: monthOrders.length });
+  }
+  return points;
+}
+
+export type TopSpendItem = {
+  key: string;
+  itemName: string;
+  amount: number;
+  quantityByUnit: Record<string, number>;
+  orderCount: number;
+};
+
+/** จัดอันดับ "รายการสินค้า" ที่ใช้เงินซื้อรวมเยอะที่สุดจากใบสั่งซื้อที่ส่งมา (ไม่รวมใบยกเลิก) เรียงมาก→น้อย ตัดที่ limit รายการ */
+export function topSpendItems(orders: PurchaseOrder[], limit = 10): TopSpendItem[] {
+  const map = new Map<string, TopSpendItem>();
+  for (const po of orders) {
+    if (po.status === 'cancelled') continue;
+    for (const it of po.items) {
+      const key = purchaseOrderItemKey(it);
+      const amount = it.quantity * it.unitPrice;
+      const existing = map.get(key);
+      if (existing) {
+        existing.amount += amount;
+        existing.orderCount += 1;
+        existing.quantityByUnit[it.unit] = (existing.quantityByUnit[it.unit] ?? 0) + it.quantity;
+      } else {
+        map.set(key, { key, itemName: it.itemName, amount, quantityByUnit: { [it.unit]: it.quantity }, orderCount: 1 });
+      }
+    }
+  }
+  return Array.from(map.values())
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, limit);
+}
+
+export type PriceChangeAlert = {
+  key: string;
+  itemName: string;
+  unit: string;
+  previousPrice: number;
+  latestPrice: number;
+  latestDate: string;
+  previousDate: string;
+  /** % เทียบจากราคาครั้งก่อนหน้า — บวก = แพงขึ้น, ลบ = ถูกลง */
+  diffPct: number;
+};
+
+/**
+ * ตรวจจับรายการที่ "ราคาต่อหน่วยครั้งล่าสุด" ต่างจาก "ครั้งก่อนหน้าที่หน่วยเดียวกัน" — ใช้ประวัติทั้งหมดเสมอ
+ * (ไม่จำกัดตามช่วงที่เลือกดูกราฟ/Top รายการ) เพราะต้องการเทียบ "ล่าสุดจริง" กับ "ก่อนหน้าจริง" ไม่ว่าจะห่างกันแค่ไหน
+ * ข้ามใบที่ถูกยกเลิกและรายการที่ราคา 0 (ยังไม่ได้กรอกราคา) เทียบเฉพาะคู่ที่หน่วยเดียวกัน เรียงตาม |% เปลี่ยนแปลง| มาก→น้อย
+ */
+export function detectPriceChanges(orders: PurchaseOrder[]): PriceChangeAlert[] {
+  type Obs = { date: string; unitPrice: number; unit: string; itemName: string };
+  const map = new Map<string, Obs[]>();
+  for (const po of orders) {
+    if (po.status === 'cancelled') continue;
+    for (const it of po.items) {
+      if (it.unitPrice <= 0) continue;
+      const key = purchaseOrderItemKey(it);
+      const list = map.get(key);
+      const obs: Obs = { date: po.orderDate, unitPrice: it.unitPrice, unit: it.unit, itemName: it.itemName };
+      if (list) list.push(obs);
+      else map.set(key, [obs]);
+    }
+  }
+  const alerts: PriceChangeAlert[] = [];
+  for (const [key, obsList] of map) {
+    const obs = [...obsList].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    const latest = obs[obs.length - 1];
+    for (let i = obs.length - 2; i >= 0; i--) {
+      const prev = obs[i];
+      if (prev.unit !== latest.unit) continue; // หน่วยไม่ตรงกัน เทียบราคากันตรงๆ ไม่ได้ ข้ามไปหาตัวก่อนหน้าอีก
+      if (prev.unitPrice !== latest.unitPrice) {
+        alerts.push({
+          key,
+          itemName: latest.itemName,
+          unit: latest.unit,
+          previousPrice: prev.unitPrice,
+          latestPrice: latest.unitPrice,
+          latestDate: latest.date,
+          previousDate: prev.date,
+          diffPct: ((latest.unitPrice - prev.unitPrice) / prev.unitPrice) * 100,
+        });
+      }
+      break; // เจอคู่เทียบที่หน่วยตรงกันแล้ว (ไม่ว่าราคาจะต่างหรือไม่) หยุดแค่นี้ ไม่ย้อนไปไกลกว่านี้
+    }
+  }
+  return alerts.sort((a, b) => Math.abs(b.diffPct) - Math.abs(a.diffPct));
 }

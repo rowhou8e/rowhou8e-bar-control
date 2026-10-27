@@ -7,7 +7,21 @@ import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { EmptyState, SecondaryButton } from '@/components/ui';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
-import { formatThaiDate, formatThaiDateTime, formatThaiMonthYear, getEmployeeName, hexToRgba, supplierColor } from '@/lib/derive';
+import {
+  detectPriceChanges,
+  formatThaiDate,
+  formatThaiDateTime,
+  formatThaiMonthYear,
+  getEmployeeName,
+  hexToRgba,
+  monthlySpendSeries,
+  supplierColor,
+  topSpendItems,
+  THAI_MONTHS_SHORT,
+  type MonthlySpendPoint,
+  type PriceChangeAlert,
+  type TopSpendItem,
+} from '@/lib/derive';
 import type { Employee, PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 
 function currentMonth() {
@@ -23,6 +37,13 @@ function shiftMonthKey(month: string, delta: number) {
 
 function poTotal(po: PurchaseOrder) {
   return po.items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
+}
+
+/** ย่อตัวเลขให้สั้นพอใส่บนแท่งกราฟแคบๆ ได้ (เช่น 35100 -> "35.1k") — ใช้เฉพาะ label บนกราฟ ที่อื่นยังโชว์เต็มเสมอ */
+function compactNumber(n: number): string {
+  if (n >= 10000) return `${Math.round(n / 1000)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString();
 }
 
 const poStatusLabels: Record<PurchaseOrderStatus, string> = {
@@ -52,6 +73,9 @@ export default function PurchaseReportPage() {
 
   const [month, setMonth] = useState(currentMonth());
   const [view, setView] = useState<BreakdownView>('supplier');
+  /** โหมดดูข้อมูล: "รายเดือน" ของเดิม vs "แนวโน้ม" (กราฟหลายเดือน/Top รายการ/ราคาที่เปลี่ยนไป) */
+  const [reportMode, setReportMode] = useState<'monthly' | 'trend'>('monthly');
+  const [trendRangeMonths, setTrendRangeMonths] = useState(6);
 
   // หน้านี้ให้ย้อนดูได้ทุกเดือนไม่จำกัด (ปุ่ม "ก่อนหน้า"/"ถัดไป") ต่างจากหน้ารายการใบสั่งซื้อที่โชว์แค่
   // ช่วงล่าสุดเป็นค่าเริ่มต้น (ดูคอมเมนต์ loadAllPurchaseOrderHistory ใน types.ts) — เลยต้องโหลดประวัติ
@@ -150,6 +174,27 @@ export default function PurchaseReportPage() {
     return { category: build('category'), item: build('item') };
   }, [monthOrders, stockItems, stockCategories]);
 
+  // ================= โหมด "แนวโน้ม" — ย้อนหลัง trendRangeMonths เดือนนับจากเดือนปัจจุบันเสมอ =================
+  // (ไม่อิงกับ "month" ที่ใช้เลื่อนดูทีละเดือนด้านบน เพื่อไม่ให้สองโหมดสับสนกัน)
+  const trendEndMonth = useMemo(() => currentMonth(), []);
+
+  const trendSeries: MonthlySpendPoint[] = useMemo(
+    () => monthlySpendSeries(purchaseOrders, trendEndMonth, trendRangeMonths),
+    [purchaseOrders, trendEndMonth, trendRangeMonths]
+  );
+
+  const trendOrders = useMemo(() => {
+    const monthKeys = new Set(trendSeries.map((p) => p.month));
+    return purchaseOrders.filter((po) => monthKeys.has(po.orderDate.slice(0, 7)) && po.status !== 'cancelled');
+  }, [purchaseOrders, trendSeries]);
+
+  const trendTopItems: TopSpendItem[] = useMemo(() => topSpendItems(trendOrders, 10), [trendOrders]);
+
+  const trendTotal = useMemo(() => trendSeries.reduce((sum, p) => sum + p.total, 0), [trendSeries]);
+
+  // ราคาที่เปลี่ยนไปใช้ "ประวัติทั้งหมด" เสมอ ไม่จำกัดตาม trendRangeMonths (ดูเหตุผลที่คอมเมนต์ detectPriceChanges)
+  const priceChanges: PriceChangeAlert[] = useMemo(() => detectPriceChanges(purchaseOrders), [purchaseOrders]);
+
   function handlePrint() {
     if (typeof window !== 'undefined') window.print();
   }
@@ -169,97 +214,135 @@ export default function PurchaseReportPage() {
         onBack={() => router.push('/purchase-orders')}
       />
       <main className="mx-auto max-w-app space-y-4 px-4 py-4 print:max-w-none print:px-0">
-        <div className="no-print flex items-center justify-between rounded-2xl bg-white p-3 shadow-card">
-          <button
-            onClick={() => shiftMonth(-1)}
-            className="rounded-full bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-600 active:bg-gray-100"
-          >
-            ก่อนหน้า
-          </button>
-          <p className="text-sm font-bold text-gray-800">{formatThaiMonthYear(month)}</p>
-          <button
-            onClick={() => shiftMonth(1)}
-            className="rounded-full bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-600 active:bg-gray-100"
-          >
-            ถัดไป
-          </button>
+        <div className="no-print flex gap-2">
+          <ViewTab label="รายเดือน" active={reportMode === 'monthly'} onClick={() => setReportMode('monthly')} />
+          <ViewTab label="แนวโน้ม" active={reportMode === 'trend'} onClick={() => setReportMode('trend')} />
         </div>
 
-        <div className="hidden print:block">
-          <p className="text-lg font-extrabold text-gray-900">Rowhou8e — รายงานสรุปใบสั่งซื้อประจำเดือน</p>
-          <p className="text-sm text-gray-700">{formatThaiMonthYear(month)}</p>
-          <p className="text-xs text-gray-500">
-            พิมพ์เมื่อ {formatThaiDateTime(printedAt.toISOString())} · จัดทำโดย {employee?.name ?? '-'}
-          </p>
-        </div>
-
-        {monthOrders.length === 0 ? (
-          <EmptyState icon="🧾" title="ไม่มีข้อมูลการซื้อในเดือนนี้" />
-        ) : (
+        {reportMode === 'monthly' && (
           <>
-            <div className="grid grid-cols-2 gap-2 print:grid-cols-4 print:gap-3 print:break-inside-avoid">
-              <SummaryCard label="ยอดซื้อรวม" value={`${total.toLocaleString()} บาท`} />
-              <SummaryCard
-                label="เทียบเดือนก่อน"
-                value={
-                  hasPrevData
-                    ? `${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toLocaleString()} บาท (${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%)`
-                    : 'ไม่มีข้อมูลเดือนก่อน'
-                }
-                tone={hasPrevData ? (diff > 0 ? 'warn' : diff < 0 ? 'ok' : 'idle') : 'idle'}
-              />
-              <SummaryCard
-                label="จำนวนใบสั่งซื้อ"
-                value={`${monthOrders.length} ใบ`}
-                hint={`รับสินค้าแล้ว ${receivedCount} ใบ`}
-              />
-              <SummaryCard
-                label="ผู้ขายที่สั่งซื้อ"
-                value={`${supplierCountUsed} ราย`}
-                hint={`เฉลี่ย ${Math.round(avgPerOrder).toLocaleString()} บาท/ใบ`}
-              />
+            <div className="no-print flex items-center justify-between rounded-2xl bg-white p-3 shadow-card">
+              <button
+                onClick={() => shiftMonth(-1)}
+                className="rounded-full bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-600 active:bg-gray-100"
+              >
+                ก่อนหน้า
+              </button>
+              <p className="text-sm font-bold text-gray-800">{formatThaiMonthYear(month)}</p>
+              <button
+                onClick={() => shiftMonth(1)}
+                className="rounded-full bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-600 active:bg-gray-100"
+              >
+                ถัดไป
+              </button>
             </div>
 
-            <div className="no-print flex gap-2">
-              <ViewTab label="ตามผู้ขาย" active={view === 'supplier'} onClick={() => setView('supplier')} />
-              <ViewTab label="ตามหมวดหมู่" active={view === 'category'} onClick={() => setView('category')} />
-              <ViewTab label="ตามรายการสินค้า" active={view === 'item'} onClick={() => setView('item')} />
+            <div className="hidden print:block">
+              <p className="text-lg font-extrabold text-gray-900">Rowhou8e — รายงานสรุปใบสั่งซื้อประจำเดือน</p>
+              <p className="text-sm text-gray-700">{formatThaiMonthYear(month)}</p>
+              <p className="text-xs text-gray-500">
+                พิมพ์เมื่อ {formatThaiDateTime(printedAt.toISOString())} · จัดทำโดย {employee?.name ?? '-'}
+              </p>
             </div>
 
-            <BreakdownTable
-              title="สรุปแยกตามผู้ขาย"
-              rows={supplierRows}
-              total={total}
-              countLabel="ใบสั่งซื้อ"
-              className={view === 'supplier' ? '' : 'hidden print:block'}
-            />
-            <BreakdownTable
-              title="สรุปแยกตามหมวดหมู่สินค้า"
-              rows={itemBreakdown.category}
-              total={total}
-              countLabel="รายการซื้อ"
-              className={view === 'category' ? '' : 'hidden print:block'}
-            />
-            <BreakdownTable
-              title="สรุปแยกตามรายการสินค้า"
-              rows={itemBreakdown.item}
-              total={total}
-              countLabel="รายการซื้อ"
-              className={view === 'item' ? '' : 'hidden print:block'}
-            />
+            {monthOrders.length === 0 ? (
+              <EmptyState icon="🧾" title="ไม่มีข้อมูลการซื้อในเดือนนี้" />
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 print:grid-cols-4 print:gap-3 print:break-inside-avoid">
+                  <SummaryCard label="ยอดซื้อรวม" value={`${total.toLocaleString()} บาท`} />
+                  <SummaryCard
+                    label="เทียบเดือนก่อน"
+                    value={
+                      hasPrevData
+                        ? `${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toLocaleString()} บาท (${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%)`
+                        : 'ไม่มีข้อมูลเดือนก่อน'
+                    }
+                    tone={hasPrevData ? (diff > 0 ? 'warn' : diff < 0 ? 'ok' : 'idle') : 'idle'}
+                  />
+                  <SummaryCard
+                    label="จำนวนใบสั่งซื้อ"
+                    value={`${monthOrders.length} ใบ`}
+                    hint={`รับสินค้าแล้ว ${receivedCount} ใบ`}
+                  />
+                  <SummaryCard
+                    label="ผู้ขายที่สั่งซื้อ"
+                    value={`${supplierCountUsed} ราย`}
+                    hint={`เฉลี่ย ${Math.round(avgPerOrder).toLocaleString()} บาท/ใบ`}
+                  />
+                </div>
 
-            <OrderDetailTable
-              orders={monthOrders}
-              supplierName={supplierName}
-              supplierColorById={supplierColorById}
-              employees={employees}
-              total={total}
-            />
+                <div className="no-print flex gap-2">
+                  <ViewTab label="ตามผู้ขาย" active={view === 'supplier'} onClick={() => setView('supplier')} />
+                  <ViewTab label="ตามหมวดหมู่" active={view === 'category'} onClick={() => setView('category')} />
+                  <ViewTab label="ตามรายการสินค้า" active={view === 'item'} onClick={() => setView('item')} />
+                </div>
 
-            <SecondaryButton onClick={handlePrint} className="no-print">
-              ปริ้นรายงาน
-            </SecondaryButton>
+                <BreakdownTable
+                  title="สรุปแยกตามผู้ขาย"
+                  rows={supplierRows}
+                  total={total}
+                  countLabel="ใบสั่งซื้อ"
+                  className={view === 'supplier' ? '' : 'hidden print:block'}
+                />
+                <BreakdownTable
+                  title="สรุปแยกตามหมวดหมู่สินค้า"
+                  rows={itemBreakdown.category}
+                  total={total}
+                  countLabel="รายการซื้อ"
+                  className={view === 'category' ? '' : 'hidden print:block'}
+                />
+                <BreakdownTable
+                  title="สรุปแยกตามรายการสินค้า"
+                  rows={itemBreakdown.item}
+                  total={total}
+                  countLabel="รายการซื้อ"
+                  className={view === 'item' ? '' : 'hidden print:block'}
+                />
+
+                <OrderDetailTable
+                  orders={monthOrders}
+                  supplierName={supplierName}
+                  supplierColorById={supplierColorById}
+                  employees={employees}
+                  total={total}
+                />
+
+                <SecondaryButton onClick={handlePrint} className="no-print">
+                  ปริ้นรายงาน
+                </SecondaryButton>
+              </>
+            )}
           </>
+        )}
+
+        {reportMode === 'trend' && (
+          <div className="no-print space-y-4">
+            <div className="flex gap-2">
+              {[3, 6, 12].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setTrendRangeMonths(n)}
+                  className={`flex-1 rounded-full py-2 text-xs font-bold ${
+                    trendRangeMonths === n ? 'bg-brand-600 text-white' : 'bg-white text-gray-500 shadow-card'
+                  }`}
+                >
+                  {n} เดือน
+                </button>
+              ))}
+            </div>
+
+            {trendTotal === 0 ? (
+              <EmptyState icon="📈" title="ยังไม่มีข้อมูลการซื้อในช่วงนี้" />
+            ) : (
+              <>
+                <MonthlyTrendChart points={trendSeries} />
+                <TopItemsCard items={trendTopItems} total={trendTotal} />
+              </>
+            )}
+
+            <PriceChangeCard alerts={priceChanges} />
+          </div>
         )}
       </main>
 
@@ -426,6 +509,117 @@ function OrderDetailTable({
           </tfoot>
         </table>
       </div>
+    </div>
+  );
+}
+
+/** กราฟแท่งยอดซื้อรายเดือน — แท่งเดียวต่อเดือน สีเข้ม = เดือนล่าสุด, สีอ่อน = เดือนก่อนๆ เพื่อให้สังเกตเดือนปัจจุบันง่าย
+ *  ใส่ label ตัวเลขไว้เฉพาะแท่งที่สูงสุดกับแท่งล่าสุด (ไม่ใส่ทุกแท่งเพราะพื้นที่แคบ อ่านยาก) */
+function MonthlyTrendChart({ points }: { points: MonthlySpendPoint[] }) {
+  if (points.length === 0) return null;
+  const max = Math.max(1, ...points.map((p) => p.total));
+  const maxIndex = points.reduce((best, p, i) => (p.total > points[best].total ? i : best), 0);
+  const lastIndex = points.length - 1;
+
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-card">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <p className="text-sm font-bold text-gray-800">แนวโน้มยอดซื้อรายเดือน</p>
+        <p className="shrink-0 text-[11px] text-gray-400">
+          {formatThaiMonthYear(points[0].month)} – {formatThaiMonthYear(points[lastIndex].month)}
+        </p>
+      </div>
+      <div className="flex h-32 items-end gap-1.5">
+        {points.map((p, i) => {
+          const heightPct = p.total > 0 ? Math.max(4, (p.total / max) * 100) : 2;
+          const showLabel = (i === maxIndex || i === lastIndex) && p.total > 0;
+          return (
+            <div key={p.month} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              <p className={`truncate text-[9px] font-bold text-gray-600 ${showLabel ? '' : 'invisible'}`}>
+                {compactNumber(p.total)}
+              </p>
+              <div
+                className={`w-full rounded-t ${i === lastIndex ? 'bg-brand-600' : 'bg-brand-300'}`}
+                style={{ height: `${heightPct}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex gap-1.5">
+        {points.map((p) => (
+          <p key={p.month} className="min-w-0 flex-1 truncate text-center text-[9px] text-gray-400">
+            {THAI_MONTHS_SHORT[Number(p.month.split('-')[1]) - 1]}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Top รายการสินค้าที่ใช้เงินซื้อรวมเยอะที่สุดในช่วงที่เลือก (คำนวณจาก topSpendItems ใน derive.ts) */
+function TopItemsCard({ items, total }: { items: TopSpendItem[]; total: number }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-card">
+      <p className="mb-2 text-sm font-bold text-gray-800">Top รายการที่ใช้เงินซื้อเยอะสุด</p>
+      <div className="space-y-2">
+        {items.map((it, i) => (
+          <div key={it.key} className="flex items-center justify-between gap-2 border-b border-gray-50 py-1.5 last:border-0">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-500">
+                {i + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-gray-800">{it.itemName}</p>
+                <p className="truncate text-[10px] text-gray-400">
+                  {Object.entries(it.quantityByUnit)
+                    .map(([unit, qty]) => `${qty.toLocaleString()} ${unit}`)
+                    .join(' + ')}{' '}
+                  · {it.orderCount} ครั้ง
+                  {total > 0 && ` · ${((it.amount / total) * 100).toFixed(1)}%`}
+                </p>
+              </div>
+            </div>
+            <p className="shrink-0 text-xs font-bold text-gray-700">{it.amount.toLocaleString()} บาท</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** รายการราคาต่อหน่วยที่เปลี่ยนไปจากครั้งก่อนหน้า (คำนวณจาก detectPriceChanges ใน derive.ts) — แพงขึ้น = ส้ม/เหลือง,
+ *  ถูกลง = เขียว ให้ความหมายตรงกับโทนสีที่การ์ด "เทียบเดือนก่อน" ใช้อยู่แล้วที่หน้าสรุปรายเดือน */
+function PriceChangeCard({ alerts }: { alerts: PriceChangeAlert[] }) {
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-card">
+      <p className="text-sm font-bold text-gray-800">ราคาต่อหน่วยที่เปลี่ยนไป{alerts.length > 0 && ` (${alerts.length} รายการ)`}</p>
+      {alerts.length === 0 ? (
+        <p className="mt-1 text-xs text-gray-400">ยังไม่พบรายการที่ราคาต่อหน่วยเปลี่ยนจากครั้งก่อนหน้า</p>
+      ) : (
+        <>
+          <p className="mb-2 mt-0.5 text-[10px] text-gray-400">เทียบราคาต่อหน่วยครั้งล่าสุดกับครั้งก่อนหน้า (หน่วยเดียวกัน) ทั้งประวัติ</p>
+          <div className="space-y-2">
+            {alerts.map((a) => {
+              const up = a.diffPct > 0;
+              return (
+                <div key={a.key} className="flex items-center justify-between gap-2 border-b border-gray-50 py-1.5 last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold text-gray-800">{a.itemName}</p>
+                    <p className="truncate text-[10px] text-gray-400">
+                      {a.previousPrice.toLocaleString()} → {a.latestPrice.toLocaleString()} บาท/{a.unit} · {formatThaiDate(a.latestDate)}
+                    </p>
+                  </div>
+                  <p className={`shrink-0 text-xs font-bold ${up ? 'text-status-warn' : 'text-status-ok'}`}>
+                    {up ? '▲' : '▼'} {Math.abs(a.diffPct).toFixed(1)}%
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

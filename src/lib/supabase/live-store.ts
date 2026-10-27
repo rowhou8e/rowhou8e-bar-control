@@ -17,7 +17,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseClient } from './client';
 import * as q from './queries';
 import { detectDeviceLabel } from '../device';
-import type { AppSettings, AppState, ChecklistEntryItem, ChecklistItemFrequency, ProductLotStatus, PurchaseOrderStatus, PurchaseRequestStatus, Role, SpecialDayType, Weekday, WorkCalendarReasonType, WorkCalendarStatus } from '../types';
+import type { AppSettings, AppState, ChecklistEntryItem, ChecklistItemFrequency, ProductLotStatus, PurchaseOrder, PurchaseOrderStatus, PurchaseRequestStatus, Role, SpecialDayType, Weekday, WorkCalendarReasonType, WorkCalendarStatus } from '../types';
 
 /** ตารางที่เปิด Postgres Changes ไว้ (ดู schema.sql ส่วน "9) REALTIME") — subscribe เพื่อให้ทุกหน้าจอ
  *  ที่เปิดค้างไว้อัปเดตสดทันทีเมื่อมีคนอื่นบันทึกข้อมูล โดยไม่ต้องรีเฟรชเอง — เฟส 4
@@ -735,8 +735,79 @@ export class LiveStore {
     }[];
     actorId: string;
   }) {
-    await q.createOrMergePurchaseOrder(input);
+    const orderId = await q.createOrMergePurchaseOrder(input);
+
+    // อัปเดต state ทันทีด้วยข้อมูลที่รู้แน่ชัดอยู่แล้วว่าถูกต้อง (มาจาก input ที่เพิ่งส่งไปบันทึกสำเร็จเอง)
+    // ไม่ต้องรอ refetch จาก DB เลย — กันไม่ให้พนักงานเห็นหน้าใบสั่งซื้อ "0 รายการ" แวบหนึ่งก่อนข้อมูลจริงมาถึง
+    const optimisticOrder = this.buildOptimisticPurchaseOrder(orderId, input);
+    this.state = { ...this.state, purchaseOrders: this.upsertPurchaseOrder(this.state.purchaseOrders, optimisticOrder) };
+    this.notify();
+
     await this.refetchPurchaseOrdersAndRequests();
+
+    // กันอีกชั้น: เผื่อ refetch ข้างบนไปชนกับ response อื่นที่เริ่มคุยกับ DB ไปก่อนหน้านี้แล้ว (เช่น scoped
+    // refetch ที่ตั้งเวลาไว้จาก realtime event ก่อนหน้า) แล้วตอบกลับมาทีหลัง ทับ state ด้วยรายการที่น้อยกว่า
+    // ที่เรารู้แน่ชัดว่าบันทึกไปแล้วจริง — ถ้าหลัง refetch ออเดอร์นี้มีรายการน้อยกว่าที่ควรจะเป็น ให้ทับด้วย
+    // optimistic data อีกรอบ เพื่อให้ผลลัพธ์สุดท้ายของฟังก์ชันนี้ถูกต้องเสมอไม่ว่า refetch จะพลาดหรือไม่
+    const afterRefetch = this.state.purchaseOrders.find((p) => p.id === orderId);
+    if (!afterRefetch || afterRefetch.items.length < optimisticOrder.items.length) {
+      this.state = { ...this.state, purchaseOrders: this.upsertPurchaseOrder(this.state.purchaseOrders, optimisticOrder) };
+      this.notify();
+    }
+
+    return orderId;
+  }
+
+  /** สร้าง PurchaseOrder (ชั่วคราว) จาก input ที่เพิ่งบันทึกสำเร็จ — ใช้เป็น "ความจริงที่รู้แน่ชัด" กันการ
+   *  แสดงรายการเป็น 0 ระหว่างรอ/กรณี refetch คืนข้อมูลเก่ามาทับ (ดูคอมเมนต์ใน createOrMergePurchaseOrder) */
+  private buildOptimisticPurchaseOrder(
+    orderId: string,
+    input: {
+      supplierId: string;
+      orderDate: string;
+      items: {
+        stockItemId: string | null;
+        itemName: string;
+        quantity: number;
+        unit: string;
+        unitPrice: number;
+        sourcePurchaseRequestId: string | null;
+      }[];
+      actorId: string;
+    }
+  ): PurchaseOrder {
+    const existing = this.state.purchaseOrders.find((p) => p.id === orderId);
+    const newItems = input.items.map((it, idx) => ({
+      id: `optimistic-${orderId}-${idx}`,
+      purchaseOrderId: orderId,
+      stockItemId: it.stockItemId,
+      itemName: it.itemName,
+      quantity: it.quantity,
+      unit: it.unit,
+      unitPrice: it.unitPrice,
+      sourcePurchaseRequestId: it.sourcePurchaseRequestId,
+    }));
+    if (existing) {
+      return { ...existing, items: [...existing.items, ...newItems] };
+    }
+    return {
+      id: orderId,
+      supplierId: input.supplierId,
+      orderDate: input.orderDate,
+      status: 'draft',
+      note: '',
+      createdBy: input.actorId,
+      createdAt: new Date().toISOString(),
+      sentAt: null,
+      receivedAt: null,
+      receivedBy: null,
+      items: newItems,
+    };
+  }
+
+  private upsertPurchaseOrder(orders: PurchaseOrder[], order: PurchaseOrder): PurchaseOrder[] {
+    const exists = orders.some((o) => o.id === order.id);
+    return exists ? orders.map((o) => (o.id === order.id ? order : o)) : [order, ...orders];
   }
 
   async updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, actorId: string) {

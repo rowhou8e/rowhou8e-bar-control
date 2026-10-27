@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppState } from '@/lib/use-store';
 import { BottomNav } from '@/components/BottomNav';
+import { VersionWatcher } from '@/components/VersionWatcher';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto min-h-screen max-w-app bg-gray-50 pb-24">
+      <VersionWatcher />
       {children}
       <BottomNav />
     </div>

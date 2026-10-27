@@ -663,7 +663,7 @@ export interface AppStore {
       sourcePurchaseRequestId: string | null;
     }[];
     actorId: string;
-  }): void | Promise<void>;
+  }): void | Promise<void> | string | Promise<string>;
   /**
    * เปลี่ยนสถานะใบสั่งซื้อ — เมื่อเปลี่ยนเป็น "received" ระบบจะเพิ่มจำนวนกลับเข้าสต๊อกอัตโนมัติ
    * และตั้งสถานะรายการเสนอซื้อต้นทางทั้งหมดในใบนี้เป็น "received" ด้วย

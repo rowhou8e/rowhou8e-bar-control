@@ -531,16 +531,17 @@ function MonthlyTrendChart({ points }: { points: MonthlySpendPoint[] }) {
       </div>
       <div className="flex h-32 items-end gap-1.5">
         {points.map((p, i) => {
-          const heightPct = p.total > 0 ? Math.max(4, (p.total / max) * 100) : 2;
+          const barMaxPx = 96;
+          const heightPx = p.total > 0 ? Math.max(4, Math.round((p.total / max) * barMaxPx)) : 2;
           const showLabel = (i === maxIndex || i === lastIndex) && p.total > 0;
           return (
-            <div key={p.month} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+            <div key={p.month} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
               <p className={`truncate text-[9px] font-bold text-gray-600 ${showLabel ? '' : 'invisible'}`}>
                 {compactNumber(p.total)}
               </p>
               <div
-                className={`w-full rounded-t ${i === lastIndex ? 'bg-brand-600' : 'bg-brand-300'}`}
-                style={{ height: `${heightPct}%` }}
+                className={`w-full shrink-0 rounded-t ${i === lastIndex ? 'bg-brand-600' : 'bg-brand-300'}`}
+                style={{ height: `${heightPx}px` }}
               />
             </div>
           );

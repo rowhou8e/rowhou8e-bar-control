@@ -33,6 +33,7 @@ export default function OrderPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -176,6 +177,7 @@ export default function OrderPage() {
   async function handleSubmit() {
     if (!employee || !valid) return;
     setSubmitting(true);
+    setSubmitError('');
     try {
       const supplierIds = new Set<string>([
         ...groupList.map(([supplierId]) => supplierId),
@@ -209,6 +211,12 @@ export default function OrderPage() {
         });
       }
       router.replace('/purchase-orders');
+    } catch (err) {
+      // บันทึกไม่สำเร็จ (เช่น เน็ตหลุดระหว่างบันทึก) — ต้องโชว์ให้พนักงานเห็น ไม่งั้นจะกดออกจากหน้านี้ไป
+      // โดยคิดว่าบันทึกสำเร็จแล้ว ทั้งที่จริงยังไม่ได้บันทึก (หรือบันทึกได้แค่บางส่วน)
+      // eslint-disable-next-line no-console
+      console.error('[order] บันทึกใบสั่งซื้อไม่สำเร็จ', err);
+      setSubmitError('บันทึกไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต แล้วเช็กในหน้า "ใบสั่งซื้อ" ก่อนว่ามีรายการที่บันทึกไปแล้วบางส่วนหรือไม่ ก่อนกดบันทึกซ้ำ (ถ้าสั่งหลายร้านพร้อมกัน บางร้านอาจบันทึกสำเร็จไปแล้วตอนที่เกิดปัญหา กดบันทึกซ้ำอาจทำให้ร้านนั้นมีรายการซ้อนกัน)');
     } finally {
       setSubmitting(false);
     }
@@ -814,6 +822,9 @@ export default function OrderPage() {
         </div>
       )}
 
+      {submitError && (
+        <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>
+      )}
       <PrimaryButton onClick={handleSubmit} disabled={!valid || submitting}>
           {`บันทึกการสั่งซื้อ (${selectedItems.length + customItems.length} รายการ)`}
         </PrimaryButton>

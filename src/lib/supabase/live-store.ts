@@ -116,6 +116,24 @@ export class LiveStore {
   private dataRetryAttempt = 0;
   private dataRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** กันเคส race condition: refetch ของ resource เดียวกันถูกเรียกซ้อนกันได้สองทาง — (1) explicit refetch
+   *  ที่เรียกทันทีหลัง mutation ของตัวเองสำเร็จ กับ (2) scoped refetch ที่มาจาก scheduleRefetch/realtime event
+   *  (ดู postgres_changes ด้านล่าง) ถ้าคำขอที่เริ่มก่อนแต่ตอบช้ากว่าดันตอบกลับมาทีหลังคำขอที่เริ่มทีหลังแต่ตอบไวกว่า
+   *  จะทับ state ที่ใหม่กว่าด้วยข้อมูลเก่า (เช่น ใบสั่งซื้อที่เพิ่ง insert รายการเสร็จ โดน refetch ที่เริ่มคุยกับ DB
+   *  ก่อนรายการจะถูก insert ทับกลับไปเป็น 0 รายการ) — refetchSeq[key] เก็บเลขคำขอล่าสุดของแต่ละ resource
+   *  ไว้เทียบตอนคำตอบกลับมา ถ้าไม่ใช่คำขอล่าสุดแล้วจะทิ้งผลลัพธ์นั้น ไม่เอาไป commit ทับ state */
+  private refetchSeq: Record<string, number> = {};
+
+  /** ดึงข้อมูลด้วย fetcher แล้ว commit เข้า state เฉพาะตอนที่ยังเป็นคำขอล่าสุดของ resource นี้เท่านั้น (ดูคอมเมนต์ refetchSeq) */
+  private async commitLatest<T>(key: string, fetcher: () => Promise<T>, apply: (data: T) => AppState) {
+    const seq = (this.refetchSeq[key] ?? 0) + 1;
+    this.refetchSeq[key] = seq;
+    const data = await fetcher();
+    if (this.refetchSeq[key] !== seq) return; // มีคำขอใหม่กว่าเริ่มไปแล้วระหว่างรอ — ทิ้งผลลัพธ์เก่าทิ้งไป
+    this.state = apply(data);
+    this.notify();
+  }
+
   /** เริ่มตรวจสอบ session ครั้งแรก — เรียกครั้งเดียวจาก useEffect ใน use-store.ts */
   hydrate() {
     if (this.started) return;
@@ -285,137 +303,97 @@ export class LiveStore {
 
   /** รีเฟรชเฉพาะข้อมูลที่กระทบจริง แทนการโหลดทั้งหมดใหม่ (refetchAll) — ใช้กับ mutation ที่ผู้ใช้กดบ่อยๆ เพื่อให้ตอบสนองไว */
   private async refetchProducts() {
-    const products = await q.fetchProducts();
-    this.state = { ...this.state, products };
-    this.notify();
+    await this.commitLatest('products', () => q.fetchProducts(), (products) => ({ ...this.state, products }));
   }
 
   private async refetchPurchaseRequests() {
-    const purchaseRequests = await q.fetchPurchaseRequests();
-    this.state = { ...this.state, purchaseRequests };
-    this.notify();
+    await this.commitLatest('purchaseRequests', () => q.fetchPurchaseRequests(), (purchaseRequests) => ({ ...this.state, purchaseRequests }));
   }
 
   private async refetchPurchaseOrdersAndRequests() {
-    const [purchaseOrders, purchaseRequests] = await Promise.all([q.fetchPurchaseOrders(), q.fetchPurchaseRequests()]);
-    this.state = { ...this.state, purchaseOrders, purchaseRequests };
-    this.notify();
+    await this.commitLatest(
+      'purchaseOrdersAndRequests',
+      () => Promise.all([q.fetchPurchaseOrders(), q.fetchPurchaseRequests()]),
+      ([purchaseOrders, purchaseRequests]) => ({ ...this.state, purchaseOrders, purchaseRequests }),
+    );
   }
 
   private async refetchOrderReminders() {
-    const orderReminders = await q.fetchOrderReminders();
-    this.state = { ...this.state, orderReminders };
-    this.notify();
+    await this.commitLatest('orderReminders', () => q.fetchOrderReminders(), (orderReminders) => ({ ...this.state, orderReminders }));
   }
 
   /** รีเฟรชเฉพาะจุด (เพิ่มเติมจาก 4 ตัวด้านบน) — ครอบคลุมตารางที่เหลือทั้งหมด เพื่อให้ mutation ทุกตัว
    *  และ realtime event ทุกตาราง อัปเดตเฉพาะส่วนของ state ที่เกี่ยวข้องจริง แทนการโหลดทั้งหมดใหม่ */
   private async refetchStations() {
-    const stations = await q.fetchStations();
-    this.state = { ...this.state, stations };
-    this.notify();
+    await this.commitLatest('stations', () => q.fetchStations(), (stations) => ({ ...this.state, stations }));
   }
 
   private async refetchEmployees() {
-    const employees = await q.fetchEmployees();
-    this.state = { ...this.state, employees };
-    this.notify();
+    await this.commitLatest('employees', () => q.fetchEmployees(), (employees) => ({ ...this.state, employees }));
   }
 
   private async refetchStockItems() {
-    const stockItems = await q.fetchStockItems();
-    this.state = { ...this.state, stockItems };
-    this.notify();
+    await this.commitLatest('stockItems', () => q.fetchStockItems(), (stockItems) => ({ ...this.state, stockItems }));
   }
 
   private async refetchStockCategories() {
-    const stockCategories = await q.fetchStockCategories();
-    this.state = { ...this.state, stockCategories };
-    this.notify();
+    await this.commitLatest('stockCategories', () => q.fetchStockCategories(), (stockCategories) => ({ ...this.state, stockCategories }));
   }
 
   private async refetchChecklistTemplate() {
-    const checklistTemplate = await q.fetchChecklistTemplateItems();
-    this.state = { ...this.state, checklistTemplate };
-    this.notify();
+    await this.commitLatest('checklistTemplate', () => q.fetchChecklistTemplateItems(), (checklistTemplate) => ({ ...this.state, checklistTemplate }));
   }
 
   private async refetchChecklistRuns() {
-    const checklistRuns = await q.fetchAllChecklistRuns();
-    this.state = { ...this.state, checklistRuns };
-    this.notify();
+    await this.commitLatest('checklistRuns', () => q.fetchAllChecklistRuns(), (checklistRuns) => ({ ...this.state, checklistRuns }));
   }
 
   private async refetchProductLots() {
-    const productLots = await q.fetchProductLots();
-    this.state = { ...this.state, productLots };
-    this.notify();
+    await this.commitLatest('productLots', () => q.fetchProductLots(), (productLots) => ({ ...this.state, productLots }));
   }
 
   private async refetchSuppliers() {
-    const suppliers = await q.fetchSuppliers();
-    this.state = { ...this.state, suppliers };
-    this.notify();
+    await this.commitLatest('suppliers', () => q.fetchSuppliers(), (suppliers) => ({ ...this.state, suppliers }));
   }
 
   private async refetchSupplierItemPrices() {
-    const supplierItemPrices = await q.fetchSupplierItemPrices();
-    this.state = { ...this.state, supplierItemPrices };
-    this.notify();
+    await this.commitLatest('supplierItemPrices', () => q.fetchSupplierItemPrices(), (supplierItemPrices) => ({ ...this.state, supplierItemPrices }));
   }
 
   private async refetchCashReports() {
-    const cashReports = await q.fetchCashReports();
-    this.state = { ...this.state, cashReports };
-    this.notify();
+    await this.commitLatest('cashReports', () => q.fetchCashReports(), (cashReports) => ({ ...this.state, cashReports }));
   }
 
   private async refetchStoreHolidays() {
-    const storeHolidays = await q.fetchStoreHolidays();
-    this.state = { ...this.state, storeHolidays };
-    this.notify();
+    await this.commitLatest('storeHolidays', () => q.fetchStoreHolidays(), (storeHolidays) => ({ ...this.state, storeHolidays }));
   }
 
   private async refetchOrderDraftPicks() {
-    const orderDraftPicks = await q.fetchOrderDraftPicks();
-    this.state = { ...this.state, orderDraftPicks };
-    this.notify();
+    await this.commitLatest('orderDraftPicks', () => q.fetchOrderDraftPicks(), (orderDraftPicks) => ({ ...this.state, orderDraftPicks }));
   }
 
   private async refetchWeeklyPatterns() {
-    const weeklyPatterns = await q.fetchWeeklyPatterns();
-    this.state = { ...this.state, weeklyPatterns };
-    this.notify();
+    await this.commitLatest('weeklyPatterns', () => q.fetchWeeklyPatterns(), (weeklyPatterns) => ({ ...this.state, weeklyPatterns }));
   }
 
   private async refetchWorkCalendarEntries() {
-    const workCalendarEntries = await q.fetchWorkCalendarEntries();
-    this.state = { ...this.state, workCalendarEntries };
-    this.notify();
+    await this.commitLatest('workCalendarEntries', () => q.fetchWorkCalendarEntries(), (workCalendarEntries) => ({ ...this.state, workCalendarEntries }));
   }
 
   private async refetchWorkCalendarHistory() {
-    const workCalendarHistory = await q.fetchWorkCalendarHistory();
-    this.state = { ...this.state, workCalendarHistory };
-    this.notify();
+    await this.commitLatest('workCalendarHistory', () => q.fetchWorkCalendarHistory(), (workCalendarHistory) => ({ ...this.state, workCalendarHistory }));
   }
 
   private async refetchSpecialDays() {
-    const specialDays = await q.fetchSpecialDays();
-    this.state = { ...this.state, specialDays };
-    this.notify();
+    await this.commitLatest('specialDays', () => q.fetchSpecialDays(), (specialDays) => ({ ...this.state, specialDays }));
   }
 
   private async refetchSettings() {
-    const settings = await q.fetchSettings();
-    this.state = { ...this.state, settings };
-    this.notify();
+    await this.commitLatest('settings', () => q.fetchSettings(), (settings) => ({ ...this.state, settings }));
   }
 
   private async refetchHistoryLogs() {
-    const historyLogs = await q.fetchHistoryLogs();
-    this.state = { ...this.state, historyLogs };
-    this.notify();
+    await this.commitLatest('historyLogs', () => q.fetchHistoryLogs(), (historyLogs) => ({ ...this.state, historyLogs }));
   }
 
   /** ตาราง -> ฟังก์ชันรีเฟรชเฉพาะจุดที่ตรงกัน ใช้ทั้งตอน mutation ของตัวเองและตอนรับ realtime event จากคนอื่น */

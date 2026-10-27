@@ -427,6 +427,94 @@ create trigger trg_stock_touch
   for each row execute function public.touch_stock_updated_at();
 
 -- ============================================================================
+-- FUNCTION: สร้าง/รวม (auto-merge) ใบสั่งซื้อ แบบ atomic — แก้บั๊ก "ใบสั่งซื้อรายการเป็น 0"
+-- เดิมโค้ดฝั่ง client ยิง insert ใบสั่งซื้อ (purchase_orders) แล้วค่อยยิง insert รายการ
+-- (purchase_order_items) เป็น 2 คำขอ HTTP แยกกัน — ถ้าเน็ตหลุด/คำขอที่สองพลาดระหว่างนั้น
+-- จะเหลือใบสั่งซื้อที่สร้างไปแล้วแต่ไม่มีรายการเลย (0 รายการ) ค้างอยู่ในระบบ
+-- ฟังก์ชันนี้รวมทุกขั้นตอน (หา/สร้างใบสั่งซื้อ + insert รายการทั้งหมด + อัปเดตสถานะรายการ
+-- เสนอซื้อต้นทาง + บันทึก history log) ไว้ใน transaction เดียว ถ้าขั้นไหนพลาดจะ rollback
+-- ทั้งหมด ไม่มีทางเหลือใบสั่งซื้อที่มีรายการเป็น 0 จากเส้นทางนี้อีก
+-- security invoker (ค่า default) — RLS policy เดิมของ purchase_orders/purchase_order_items/
+-- purchase_requests/history_logs ยังคุมสิทธิ์ตามบทบาทผู้เรียกเหมือนเดิมทุกอย่าง ไม่ได้ข้าม RLS
+-- ============================================================================
+create or replace function public.create_or_merge_purchase_order(
+  p_supplier_id uuid,
+  p_order_date date,
+  p_items jsonb,
+  p_actor_id uuid
+)
+returns uuid
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_order_id uuid;
+  v_existing boolean;
+  v_supplier_name text;
+  v_item_count int;
+  v_source_ids uuid[];
+begin
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'ต้องมีรายการสินค้าอย่างน้อย 1 รายการ';
+  end if;
+
+  select id into v_order_id
+  from public.purchase_orders
+  where supplier_id = p_supplier_id
+    and order_date = p_order_date
+    and status = 'draft'
+  limit 1;
+
+  v_existing := v_order_id is not null;
+
+  if not v_existing then
+    insert into public.purchase_orders (supplier_id, order_date, status, created_by)
+    values (p_supplier_id, p_order_date, 'draft', p_actor_id)
+    returning id into v_order_id;
+  end if;
+
+  insert into public.purchase_order_items
+    (purchase_order_id, stock_item_id, item_name, quantity, unit, unit_price, source_purchase_request_id)
+  select
+    v_order_id,
+    (item ->> 'stockItemId')::uuid,
+    item ->> 'itemName',
+    (item ->> 'quantity')::numeric,
+    item ->> 'unit',
+    (item ->> 'unitPrice')::numeric,
+    (item ->> 'sourcePurchaseRequestId')::uuid
+  from jsonb_array_elements(p_items) as item;
+
+  select array_agg(distinct (item ->> 'sourcePurchaseRequestId')::uuid)
+  into v_source_ids
+  from jsonb_array_elements(p_items) as item
+  where item ->> 'sourcePurchaseRequestId' is not null;
+
+  if v_source_ids is not null and array_length(v_source_ids, 1) > 0 then
+    update public.purchase_requests
+    set status = 'ordered'
+    where id = any(v_source_ids);
+  end if;
+
+  select name into v_supplier_name from public.suppliers where id = p_supplier_id;
+  v_item_count := jsonb_array_length(p_items);
+
+  insert into public.history_logs (action_type, actor_id, target_label, detail)
+  values (
+    'po_create',
+    p_actor_id,
+    'ใบสั่งซื้อ · ' || coalesce(v_supplier_name, p_supplier_id::text) || ' · ' || p_order_date::text,
+    case when v_existing
+      then 'รวมรายการเพิ่มเข้าใบสั่งซื้อเดิม ' || v_item_count || ' รายการ'
+      else 'สร้างใบสั่งซื้อใหม่ ' || v_item_count || ' รายการ'
+    end
+  );
+
+  return v_order_id;
+end;
+$$;
+
+-- ============================================================================
 -- 9) REALTIME — เปิด Postgres Changes ให้ตารางหลัก เพื่อให้ทุกหน้าจอที่เปิดค้างไว้
 --    อัปเดตสดทันทีเมื่อมีคนอื่นบันทึกข้อมูล (เช็กลิสต์/สต๊อก/ใบสั่งซื้อ ฯลฯ) — เฟส 4
 --    ใช้ DO block เพื่อให้รันซ้ำได้โดยไม่ error (publication ไม่มี "add table if not exists")

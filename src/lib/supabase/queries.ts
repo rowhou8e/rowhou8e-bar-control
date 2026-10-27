@@ -1078,56 +1078,26 @@ export async function createOrMergePurchaseOrder(input: {
 }) {
   const sb = getSupabaseClient();
 
-  const { data: existing } = await sb
-    .from('purchase_orders')
-    .select('id')
-    .eq('supplier_id', input.supplierId)
-    .eq('order_date', input.orderDate)
-    .eq('status', 'draft')
-    .maybeSingle();
-
-  let orderId: string;
-  if (existing) {
-    orderId = existing.id;
-  } else {
-    const { data: order, error } = await sb
-      .from('purchase_orders')
-      .insert({ supplier_id: input.supplierId, order_date: input.orderDate, status: 'draft', created_by: input.actorId })
-      .select()
-      .single();
-    if (error) throw error;
-    orderId = order.id;
-  }
-
-  const rows = input.items.map((it) => ({
-    purchase_order_id: orderId,
-    stock_item_id: it.stockItemId,
-    item_name: it.itemName,
-    quantity: it.quantity,
-    unit: it.unit,
-    unit_price: it.unitPrice,
-    source_purchase_request_id: it.sourcePurchaseRequestId,
-  }));
-  const { error: itemsError } = await sb.from('purchase_order_items').insert(rows);
-  if (itemsError) throw itemsError;
-
-  // รายการเสนอซื้อต้นทางที่ถูกรวมเข้าใบสั่งซื้อแล้ว ตั้งสถานะเป็น "ordered" ทันที
-  const sourceIds = input.items.map((it) => it.sourcePurchaseRequestId).filter((id): id is string => !!id);
-  if (sourceIds.length > 0) {
-    await sb.from('purchase_requests').update({ status: 'ordered' }).in('id', sourceIds);
-  }
-
-  const { data: supplier } = await sb.from('suppliers').select('name').eq('id', input.supplierId).single();
-  await sb.from('history_logs').insert({
-    action_type: 'po_create',
-    actor_id: input.actorId,
-    target_label: `ใบสั่งซื้อ · ${supplier?.name ?? input.supplierId} · ${input.orderDate}`,
-    detail: existing
-      ? `รวมรายการเพิ่มเข้าใบสั่งซื้อเดิม ${input.items.length} รายการ`
-      : `สร้างใบสั่งซื้อใหม่ ${input.items.length} รายการ`,
+  // เรียก RPC เดียว (transaction เดียวทั้งหมด) แทนการยิง insert แยก 2-3 คำขอ HTTP เหมือนเดิม
+  // — เดิมถ้าเน็ตหลุด/คำขอใดคำขอหนึ่งพลาดระหว่างขั้นตอน จะเหลือใบสั่งซื้อที่สร้างไปแล้ว
+  // แต่ไม่มีรายการเลย (0 รายการ) ค้างอยู่ในระบบ ย้ายไปทำฝั่ง DB (ดู schema.sql ฟังก์ชัน
+  // create_or_merge_purchase_order) เพื่อให้ขั้นตอนทั้งหมด rollback พร้อมกันถ้าพลาดจุดใดจุดหนึ่ง
+  const { data: orderId, error } = await sb.rpc('create_or_merge_purchase_order', {
+    p_supplier_id: input.supplierId,
+    p_order_date: input.orderDate,
+    p_items: input.items.map((it) => ({
+      stockItemId: it.stockItemId,
+      itemName: it.itemName,
+      quantity: it.quantity,
+      unit: it.unit,
+      unitPrice: it.unitPrice,
+      sourcePurchaseRequestId: it.sourcePurchaseRequestId,
+    })),
+    p_actor_id: input.actorId,
   });
+  if (error) throw error;
 
-  return orderId;
+  return orderId as string;
 }
 
 /** เปลี่ยนสถานะใบสั่งซื้อ — received จะเพิ่มจำนวนกลับเข้าสต๊อกอัตโนมัติ + อัปเดตรายการเสนอซื้อต้นทางเป็น received

@@ -1057,9 +1057,21 @@ async function fetchAllRowsPaginated<T>(
 }
 
 // ================= PURCHASE ORDERS (แยกจาก purchase_requests — auto-merge ตามผู้ขาย+วันที่) =================
-export async function fetchPurchaseOrders(): Promise<PurchaseOrder[]> {
+/**
+ * sinceDate (ไม่ใส่ = ดึงทั้งหมด): จำกัดให้ดึงเฉพาะใบสั่งซื้อที่ order_date >= sinceDate เท่านั้น — กันไว้
+ * ล่วงหน้าไม่ให้ query/payload โตขึ้นเรื่อยๆ ไม่มีที่สิ้นสุดตามอายุการเปิดร้าน (ปัจจุบัน 115 ใบ/1,084
+ * รายการ ยังเล็กอยู่ แต่จะโตต่อเนื่องทุกวัน) — แต่ใบที่ "ยังไม่จบงาน" (ร่าง/ส่งแล้ว/ยืนยันแล้ว) จะติดมาด้วย
+ * เสมอไม่ว่าจะเก่าแค่ไหน เพราะยังต้องใช้งานจริง (เช่น แจ้งเตือน "สั่งแล้วยังไม่ได้รับของ") ตัดได้เฉพาะใบที่
+ * จบงานแล้ว (received/cancelled) ที่เก่ากว่า sinceDate เท่านั้น — ผู้เรียกที่ต้องการประวัติเต็มทุกใบ (เช่น
+ * หน้าสรุปรายเดือนที่ย้อนดูเดือนไหนก็ได้ หรือกด "ดูประวัติทั้งหมด") ให้เรียกโดยไม่ใส่ sinceDate เหมือนเดิม
+ */
+export async function fetchPurchaseOrders(sinceDate?: string | null): Promise<PurchaseOrder[]> {
   const sb = getSupabaseClient();
-  const { data: orders, error } = await sb.from('purchase_orders').select('*').order('created_at', { ascending: false });
+  let ordersQuery = sb.from('purchase_orders').select('*').order('created_at', { ascending: false });
+  if (sinceDate) {
+    ordersQuery = ordersQuery.or(`order_date.gte.${sinceDate},and(status.neq.received,status.neq.cancelled)`);
+  }
+  const { data: orders, error } = await ordersQuery;
   if (error) throw error;
   if (!orders || orders.length === 0) return [];
 

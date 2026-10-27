@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
+import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { EmptyState, SecondaryButton } from '@/components/ui';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
@@ -51,6 +52,13 @@ export default function PurchaseReportPage() {
 
   const [month, setMonth] = useState(currentMonth());
   const [view, setView] = useState<BreakdownView>('supplier');
+
+  // หน้านี้ให้ย้อนดูได้ทุกเดือนไม่จำกัด (ปุ่ม "ก่อนหน้า"/"ถัดไป") ต่างจากหน้ารายการใบสั่งซื้อที่โชว์แค่
+  // ช่วงล่าสุดเป็นค่าเริ่มต้น (ดูคอมเมนต์ loadAllPurchaseOrderHistory ใน types.ts) — เลยต้องโหลดประวัติ
+  // เต็มทันทีที่เปิดหน้านี้ ไม่งั้นเดือนเก่าๆ ที่ยังไม่ได้โหลดจะสรุปยอดผิด (เห็นน้อยกว่าความจริง)
+  useEffect(() => {
+    void store.loadAllPurchaseOrderHistory();
+  }, []);
 
   const prevMonth = useMemo(() => shiftMonthKey(month, -1), [month]);
 

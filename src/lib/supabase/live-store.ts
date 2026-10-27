@@ -66,6 +66,15 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** จำนวนเดือนย้อนหลังที่ fetchPurchaseOrders โหลดมาเป็นค่าเริ่มต้น (ดูคอมเมนต์ fetchPurchaseOrders ใน queries.ts) */
+const PURCHASE_ORDER_DEFAULT_LOOKBACK_MONTHS = 6;
+
+function purchaseOrderDefaultSinceDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - PURCHASE_ORDER_DEFAULT_LOOKBACK_MONTHS);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const DEFAULT_SETTINGS: AppSettings = {
   checklistStartTime: '07:00',
   checklistDueTime: '10:00',
@@ -90,6 +99,7 @@ function emptyState(initializing: boolean): AppState {
     suppliers: [],
     supplierItemPrices: [],
     purchaseOrders: [],
+    purchaseOrdersFullHistoryLoaded: false,
     cashReports: [],
     storeHolidays: [],
     orderReminders: [],
@@ -115,6 +125,11 @@ export class LiveStore {
   private initRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private dataRetryAttempt = 0;
   private dataRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** ช่วงวันที่เริ่มต้นที่ fetchPurchaseOrders ใช้จำกัดผลลัพธ์ — null แปลว่าโหลดประวัติทั้งหมดแบบไม่จำกัดแล้ว
+   *  (ดู loadAllPurchaseOrderHistory ด้านล่าง) ค่านี้มีแต่จะ "กว้างขึ้น" เท่านั้นตลอด session ไม่มีการย่อกลับ
+   *  เพื่อไม่ให้ guardAgainstSpuriousEmptyItems สับสนกับใบที่เคยโหลดมาแล้วแต่หายไปจากช่วงที่แคบลง */
+  private purchaseOrdersSinceDate: string | null = purchaseOrderDefaultSinceDate();
 
   /** กันเคส race condition: refetch ของ resource เดียวกันถูกเรียกซ้อนกันได้สองทาง — (1) explicit refetch
    *  ที่เรียกทันทีหลัง mutation ของตัวเองสำเร็จ กับ (2) scoped refetch ที่มาจาก scheduleRefetch/realtime event
@@ -229,7 +244,7 @@ export class LiveStore {
         q.fetchPurchaseRequests(),
         q.fetchSuppliers(),
         q.fetchSupplierItemPrices(),
-        q.fetchPurchaseOrders(),
+        q.fetchPurchaseOrders(this.purchaseOrdersSinceDate),
         q.fetchCashReports(),
         q.fetchStoreHolidays(),
         q.fetchOrderReminders(),
@@ -255,6 +270,7 @@ export class LiveStore {
         suppliers,
         supplierItemPrices,
         purchaseOrders,
+        purchaseOrdersFullHistoryLoaded: this.purchaseOrdersSinceDate === null,
         cashReports,
         storeHolidays,
         orderReminders,
@@ -313,13 +329,24 @@ export class LiveStore {
   private async refetchPurchaseOrdersAndRequests() {
     await this.commitLatest(
       'purchaseOrdersAndRequests',
-      () => Promise.all([q.fetchPurchaseOrders(), q.fetchPurchaseRequests()]),
+      () => Promise.all([q.fetchPurchaseOrders(this.purchaseOrdersSinceDate), q.fetchPurchaseRequests()]),
       ([purchaseOrders, purchaseRequests]) => ({
         ...this.state,
         purchaseOrders: this.guardAgainstSpuriousEmptyItems(purchaseOrders),
+        purchaseOrdersFullHistoryLoaded: this.purchaseOrdersSinceDate === null,
         purchaseRequests,
       }),
     );
+  }
+
+  /** โหลดประวัติใบสั่งซื้อทั้งหมดแบบไม่จำกัดช่วงวันที่ (ดูคอมเมนต์ purchaseOrdersSinceDate ด้านบนและ
+   *  fetchPurchaseOrders ใน queries.ts) — เรียกจากหน้ารายการใบสั่งซื้อตอนกด "ดูประวัติทั้งหมด" และจาก
+   *  หน้าสรุปรายเดือนตอนเปิดหน้า (ต้องย้อนดูเดือนไหนก็ได้) โหลดครั้งเดียวแล้วค้างไว้ตลอด session ไม่มีการ
+   *  ย่อกลับไปเป็นช่วงแคบอีก เรียกซ้ำได้อย่างปลอดภัย (no-op ถ้าโหลดเต็มไปแล้ว) */
+  async loadAllPurchaseOrderHistory() {
+    if (this.purchaseOrdersSinceDate === null) return;
+    this.purchaseOrdersSinceDate = null;
+    await this.refetchPurchaseOrdersAndRequests();
   }
 
   /** กันเคส purchase_order_items อ่านได้ผลลัพธ์ว่างผิดปกติชั่วคราว (เช่น auth token กำลัง refresh พอดี

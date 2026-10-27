@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
+import { store } from '@/lib/store';
 import { Header } from '@/components/Header';
 import { PurchaseOrderStatusBadge } from '@/components/StatusBadge';
 import { EmptyState, PrimaryButton, SecondaryButton } from '@/components/ui';
@@ -21,10 +22,20 @@ const TABS: { value: PurchaseOrderStatus | 'all'; label: string }[] = [
 export default function PurchaseOrdersPage() {
   const router = useRouter();
   const employee = useCurrentEmployee();
-  const { purchaseOrders, suppliers } = useAppState();
+  const { purchaseOrders, purchaseOrdersFullHistoryLoaded, suppliers } = useAppState();
   const [tab, setTab] = useState<PurchaseOrderStatus | 'all'>('all');
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const canManage = employee?.role === 'owner' || employee?.role === 'manager';
+
+  async function handleLoadFullHistory() {
+    setLoadingHistory(true);
+    try {
+      await store.loadAllPurchaseOrderHistory();
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
 
   const filtered = purchaseOrders
     .filter((po) => tab === 'all' || po.status === tab)
@@ -91,6 +102,12 @@ export default function PurchaseOrdersPage() {
               );
             })}
           </div>
+        )}
+
+        {!purchaseOrdersFullHistoryLoaded && (
+          <SecondaryButton onClick={handleLoadFullHistory}>
+            {loadingHistory ? 'กำลังโหลด…' : 'ดูประวัติทั้งหมด (เก่ากว่านี้)'}
+          </SecondaryButton>
         )}
       </main>
     </div>

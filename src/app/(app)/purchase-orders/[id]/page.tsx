@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { store } from '@/lib/store';
@@ -21,7 +21,8 @@ export default function PurchaseOrderDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const employee = useCurrentEmployee();
-  const { purchaseOrders, suppliers, employees, stockItems, stockCategories, supplierItemPrices } = useAppState();
+  const { purchaseOrders, purchaseOrdersFullHistoryLoaded, suppliers, employees, stockItems, stockCategories, supplierItemPrices } =
+    useAppState();
 
   const po = purchaseOrders.find((p) => p.id === params.id);
   const canManage = employee?.role === 'owner' || employee?.role === 'manager';
@@ -33,12 +34,21 @@ export default function PurchaseOrderDetailPage() {
   const [addingItem, setAddingItem] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
 
+  // เปิดลิงก์ตรงมาที่ใบสั่งซื้อเก่าที่ยังไม่อยู่ในช่วงที่โหลดเริ่มต้น (เช่น จากรูป/ข้อความที่เคยแชร์ไว้)
+  // — โหลดประวัติทั้งหมดให้อัตโนมัติเงียบๆ ก่อนสรุปว่า "ไม่พบ" จริงๆ (ดู loadAllPurchaseOrderHistory ใน types.ts)
+  useEffect(() => {
+    if (!po && !purchaseOrdersFullHistoryLoaded) {
+      void store.loadAllPurchaseOrderHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [po, purchaseOrdersFullHistoryLoaded]);
+
   if (!po) {
     return (
       <div>
         <Header title="ไม่พบใบสั่งซื้อ" currentEmployee={employee} onBack={() => router.back()} />
         <main className="px-4 py-6">
-          <EmptyState title="ไม่พบข้อมูลใบสั่งซื้อนี้" />
+          <EmptyState title={purchaseOrdersFullHistoryLoaded ? 'ไม่พบข้อมูลใบสั่งซื้อนี้' : 'กำลังโหลดประวัติใบสั่งซื้อ…'} />
         </main>
       </div>
     );

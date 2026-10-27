@@ -101,6 +101,8 @@ function loadInitialState(): AppState {
     suppliers: initialSuppliers,
     supplierItemPrices: initialSupplierItemPrices,
     purchaseOrders: initialPurchaseOrders,
+    // mock store ไม่มีการจำกัดช่วงวันที่แบบ live store (ดู loadAllPurchaseOrderHistory) — มีข้อมูลครบอยู่แล้วเสมอ
+    purchaseOrdersFullHistoryLoaded: true,
     cashReports: initialCashReports,
     storeHolidays: initialStoreHolidays,
     orderReminders: initialOrderReminders,
@@ -148,7 +150,9 @@ class Store {
     if (raw) {
       const revived = reviveState(raw);
       if (revived) {
-        this.state = { ...revived, initializing: false };
+        // บังคับ true เสมอไม่ว่า state เก่าที่ revive มาจาก localStorage จะมีฟิลด์นี้หรือไม่ (เพิ่มเข้ามาทีหลัง)
+        // — mock store ไม่มีการจำกัดช่วงวันที่อยู่แล้ว ไม่ต้องพึ่งค่าที่ revive มา
+        this.state = { ...revived, initializing: false, purchaseOrdersFullHistoryLoaded: true };
         this.notify();
         return;
       }
@@ -946,6 +950,10 @@ class Store {
       return { ...s, purchaseOrders };
     });
   }
+
+  /** mock store มีข้อมูลครบอยู่ในหน่วยความจำอยู่แล้วเสมอ ไม่ได้จำกัดช่วงวันที่แบบ live store
+   *  — เมธอดนี้มีไว้ให้ตรงกับ interface AppStore เท่านั้น ไม่ต้องทำอะไรเพิ่ม */
+  loadAllPurchaseOrderHistory() {}
 
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   /** บันทึกรายงานเงินสดของวันที่ระบุ */

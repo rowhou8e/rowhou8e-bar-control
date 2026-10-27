@@ -454,6 +454,12 @@ export interface AppState {
   suppliers: Supplier[];
   supplierItemPrices: SupplierItemPrice[];
   purchaseOrders: PurchaseOrder[];
+  /**
+   * true เมื่อ purchaseOrders ด้านบนมีประวัติ "ครบทุกใบตั้งแต่เปิดร้าน" แล้ว — false เมื่อยังเป็นแค่ช่วง
+   * ที่โหลดเริ่มต้นแบบจำกัดช่วงวันที่ (ดูคอมเมนต์ loadAllPurchaseOrderHistory ด้านล่าง) mock store ไม่มีการ
+   * จำกัดช่วงอยู่แล้ว จึงเป็น true เสมอ — ใช้ค่านี้ที่หน้าจอเพื่อตัดสินใจว่าจะโชว์ปุ่ม "ดูประวัติทั้งหมด" ไหม
+   */
+  purchaseOrdersFullHistoryLoaded: boolean;
   cashReports: CashReport[];
   storeHolidays: StoreHoliday[];
   orderReminders: OrderReminder[];
@@ -682,6 +688,14 @@ export interface AppStore {
   }): void | Promise<void>;
   /** ลบรายการสินค้าออกจากใบสั่งซื้อฉบับร่าง (ลบได้เฉพาะขณะยังเป็นฉบับร่าง) */
   removePurchaseOrderItem(purchaseOrderId: string, itemId: string, actorId: string): void | Promise<void>;
+  /**
+   * โหลดประวัติใบสั่งซื้อ "ทั้งหมด" แบบไม่จำกัดช่วงวันที่ — ปกติ live store จะโหลดแค่ใบสั่งซื้อย้อนหลัง
+   * ไม่กี่เดือน + ใบที่ยังไม่จบงาน (ร่าง/ส่งแล้ว/ยืนยันแล้ว) เป็นค่าเริ่มต้นเท่านั้น เพื่อไม่ให้ต้องโหลดข้อมูล
+   * เพิ่มขึ้นเรื่อยๆ ไม่มีที่สิ้นสุดตามอายุการเปิดร้าน (ดูรายละเอียดที่ fetchPurchaseOrders ใน queries.ts)
+   * เรียกเมธอดนี้เมื่อต้องดูประวัติเก่ากว่าช่วงเริ่มต้น เช่น กด "ดูประวัติทั้งหมด" ที่หน้ารายการใบสั่งซื้อ
+   * หรือหน้าสรุปรายเดือนที่ผู้ใช้ย้อนดูเดือนไหนก็ได้ — mock store ไม่จำกัดช่วงอยู่แล้วจึงไม่ต้องทำอะไร
+   */
+  loadAllPurchaseOrderHistory(): void | Promise<void>;
 
   // ================= รายงานเงินสดปิดร้าน (owner/manager เท่านั้น) — เฟส 3 =================
   /** บันทึกรายงานเงินสดของวันที่ระบุ */

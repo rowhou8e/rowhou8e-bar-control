@@ -314,8 +314,39 @@ export class LiveStore {
     await this.commitLatest(
       'purchaseOrdersAndRequests',
       () => Promise.all([q.fetchPurchaseOrders(), q.fetchPurchaseRequests()]),
-      ([purchaseOrders, purchaseRequests]) => ({ ...this.state, purchaseOrders, purchaseRequests }),
+      ([purchaseOrders, purchaseRequests]) => ({
+        ...this.state,
+        purchaseOrders: this.guardAgainstSpuriousEmptyItems(purchaseOrders),
+        purchaseRequests,
+      }),
     );
+  }
+
+  /** กันเคส purchase_order_items อ่านได้ผลลัพธ์ว่างผิดปกติชั่วคราว (เช่น auth token กำลัง refresh พอดี
+   *  ตอนยิง request จนทำให้ query คืนแถวว่างเปล่าแวบหนึ่งโดยไม่ error) แล้วเอาไปทับรายการที่ state เดิม
+   *  มีอยู่ถูกต้องให้กลายเป็น "0 รายการ" ทั้งที่ของจริงในฐานข้อมูลไม่ได้หายไปไหน (ยืนยันแล้วหลาย
+   *  ครั้งผ่าน SQL Editor ตรงๆ ว่า purchase_order_items ในฐานข้อมูลมีครบ แต่ที่หน้าจอโชว์ 0) — ถ้า
+   *  ออเดอร์ไหนที่ state เดิมมีรายการอยู่แล้ว (>0) แต่ fetch รอบนี้ได้ 0 รายการ ให้สงสัยไว้ก่อนแล้วคง
+   *  รายการเดิมไว้ (ไม่ทับ) พร้อม log ไว้เพื่อตรวจสอบย้อนหลัง
+   *  หมายเหตุ: การลบรายการสุดท้ายออกจริงๆ จนเหลือ 0 (removePurchaseOrderItem) จะอัปเดต state ให้เป็น 0
+   *  เองแบบ optimistic ไปก่อนแล้ว (ดูเมธอดนั้น) ดังนั้นตอน refetch มาถึงจุดนี้ state เดิมจะเป็น 0 อยู่แล้ว
+   *  ไม่โดนเงื่อนไขนี้กันไว้ผิดจุด */
+  private guardAgainstSpuriousEmptyItems(freshOrders: PurchaseOrder[]): PurchaseOrder[] {
+    return freshOrders.map((fresh) => {
+      if (fresh.items.length === 0) {
+        const prev = this.state.purchaseOrders.find((p) => p.id === fresh.id);
+        if (prev && prev.items.length > 0) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[LiveStore] purchase_order_items fetch คืนค่าว่างผิดปกติสำหรับใบสั่งซื้อ',
+            fresh.id,
+            '— คงรายการเดิมไว้ก่อนแทนที่จะโชว์ 0 รายการ'
+          );
+          return { ...fresh, items: prev.items };
+        }
+      }
+      return fresh;
+    });
   }
 
   private async refetchOrderReminders() {
@@ -836,6 +867,17 @@ export class LiveStore {
 
   async removePurchaseOrderItem(purchaseOrderId: string, itemId: string, actorId: string) {
     await q.removePurchaseOrderItem(purchaseOrderId, itemId, actorId);
+
+    // ตัดรายการนี้ออกจาก state ทันที ไม่ต้องรอ refetch — สำคัญเผื่อกรณีลบรายการสุดท้ายออกจนเหลือ 0 จริงๆ
+    // (ถูกต้องตามที่ผู้ใช้ตั้งใจลบ) เพื่อให้ guardAgainstSpuriousEmptyItems (ดูที่ refetchPurchaseOrdersAndRequests)
+    // รู้ว่า state ก่อนหน้า refetch รอบถัดไปเป็น 0 อยู่แล้วจริงๆ จะได้ไม่ไปกันผลลัพธ์ 0 ที่ถูกต้องนี้ไว้ผิดจุด
+    const existing = this.state.purchaseOrders.find((p) => p.id === purchaseOrderId);
+    if (existing) {
+      const updated = { ...existing, items: existing.items.filter((it) => it.id !== itemId) };
+      this.state = { ...this.state, purchaseOrders: this.upsertPurchaseOrder(this.state.purchaseOrders, updated) };
+      this.notify();
+    }
+
     await this.refetchPurchaseOrdersAndRequests();
   }
 

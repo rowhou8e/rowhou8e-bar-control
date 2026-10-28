@@ -205,6 +205,10 @@ alter table public.suppliers add column if not exists color text;
 -- พนักงานเลือกผู้ขายเองตอนสั่งสินค้าไม่ได้อีกต่อไป — หน้า "สั่งสินค้า" ใช้ค่านี้โดยตรง (ต้องมาหลัง suppliers เพราะอ้างอิงถึง)
 alter table public.stock_items add column if not exists supplier_id uuid references public.suppliers (id);
 
+-- รูปตัวอย่างวัตถุดิบ (เก็บลิงก์ไปยัง Supabase Storage bucket "stock-photos" ไม่ใช่ตัวไฟล์รูปตรงๆ)
+-- ช่วยแยกรายการชื่อคล้ายกัน (เช่น "01กระชาย" vs "กระชาย") ตั้งค่าได้ที่หน้า "ตั้งค่าระบบ" ไม่บังคับกรอก
+alter table public.stock_items add column if not exists photo_url text;
+
 -- ประวัติราคาต่อวัตถุดิบต่อผู้ขาย (append-only ห้ามแก้ไข/ลบ — เพิ่มแถวใหม่เสมอเมื่อราคาเปลี่ยน)
 -- รองรับวัตถุดิบชนิดเดียวกันซื้อได้จากหลายผู้ขาย และหน่วยที่ผู้ขายแต่ละรายขาย อาจต่างจาก unit หลักของวัตถุดิบ (เช่น ลัง/ขวด)
 create table if not exists public.supplier_item_prices (

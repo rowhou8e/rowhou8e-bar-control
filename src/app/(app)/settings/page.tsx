@@ -1380,6 +1380,7 @@ function StockItemRow({
   const [categoryId, setCategoryId] = useState(item.categoryId);
   const [unit, setUnit] = useState(item.unit);
   const [supplierId, setSupplierId] = useState(item.supplierId ?? '');
+  const [photoUrl, setPhotoUrl] = useState(item.photoUrl ?? null);
 
   function handleSave() {
     if (!name.trim() || !unit.trim()) return;
@@ -1390,6 +1391,7 @@ function StockItemRow({
         categoryId,
         unit: unit.trim(),
         supplierId: supplierId || null,
+        photoUrl,
       },
       employeeId
     );
@@ -1399,6 +1401,9 @@ function StockItemRow({
   if (editing) {
     return (
       <div className="space-y-1.5 border-b border-gray-50 py-2 text-xs">
+        <div className="flex justify-center">
+          <PhotoAttach value={photoUrl} onChange={setPhotoUrl} bucket="stock-photos" employeeId={employeeId} label="รูปสินค้า" />
+        </div>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -1455,12 +1460,20 @@ function StockItemRow({
 
   return (
     <div className="flex items-center justify-between gap-2 border-b border-gray-50 py-1.5 text-xs">
-      <div className="min-w-0 flex-1">
-        <span className="text-gray-700">{item.name}</span>
-        <span className="ml-1.5 text-gray-400">{item.unit}</span>
-        <span className={`ml-1.5 ${supplierName ? 'text-gray-400' : 'font-semibold text-status-warn'}`}>
-          {supplierName ? `· ${supplierName}` : '· ยังไม่ระบุผู้ขาย'}
-        </span>
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {item.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.photoUrl} alt={item.name} className="h-7 w-7 shrink-0 rounded-md object-cover" />
+        ) : (
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-50 text-xs text-gray-300">📦</span>
+        )}
+        <div className="min-w-0 flex-1">
+          <span className="text-gray-700">{item.name}</span>
+          <span className="ml-1.5 text-gray-400">{item.unit}</span>
+          <span className={`ml-1.5 ${supplierName ? 'text-gray-400' : 'font-semibold text-status-warn'}`}>
+            {supplierName ? `· ${supplierName}` : '· ยังไม่ระบุผู้ขาย'}
+          </span>
+        </div>
       </div>
       <div className="flex shrink-0 gap-1">
         <button onClick={() => setEditing(true)} className="rounded-md bg-gray-100 px-1.5 py-1 text-[10px] font-semibold text-gray-600">

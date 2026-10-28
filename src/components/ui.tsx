@@ -29,7 +29,35 @@ export function RoleGate({ role, allow, children }: { role: Role | undefined; al
   return <>{children}</>;
 }
 
-/** แนบรูปภาพ – โหมด mock: เก็บเป็น data URL ในเบราว์เซอร์ / โหมด supabase: อัปโหลดขึ้น Supabase Storage bucket จริงแล้วเก็บ URL (ดู README) */
+/**
+ * ย่อ/บีบอัดรูปก่อนอัปโหลด — จำกัดด้านยาวสุดไม่เกิน maxDim px แล้วแปลงเป็น JPEG คุณภาพ ~0.8
+ * ลดขนาดไฟล์จากรูปถ่ายมือถือ (มักหลาย MB) ลงเหลือหลักสิบ-ร้อย KB เพื่อไม่ให้พื้นที่เก็บรูปบานในระยะยาว
+ * ถ้าบีบอัดไม่สำเร็จ (เช่น browser ไม่รองรับ) จะคืนไฟล์ต้นฉบับแทน ไม่บล็อกการอัปโหลด
+ */
+async function compressImage(file: File, maxDim = 1024, quality = 0.8): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+    if (!blob) return file;
+    const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+    return new File([blob], newName, { type: 'image/jpeg' });
+  } catch (err) {
+    console.error('compressImage failed, using original file', err);
+    return file;
+  }
+}
+
+/** แนบรูปภาพ – โหมด mock: เก็บเป็น data URL ในเบราว์เซอร์ / โหมด supabase: อัปโหลดขึ้น Supabase Storage bucket จริงแล้วเก็บ URL (ดู README)
+ *  ทั้งสองโหมดบีบอัด/ย่อขนาดรูปก่อนเสมอ (ดู compressImage ด้านบน) */
 export function PhotoAttach({
   value,
   onChange,
@@ -40,35 +68,37 @@ export function PhotoAttach({
   value: string | null;
   onChange: (url: string | null) => void;
   label?: string;
-  bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos' | 'employee-photos';
+  bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos' | 'employee-photos' | 'stock-photos';
   employeeId: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const rawFile = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (!rawFile) return;
     setUploadError(null);
+    setUploading(true);
+    try {
+      const file = await compressImage(rawFile);
 
-    if (getDataMode() === 'supabase') {
-      setUploading(true);
-      try {
+      if (getDataMode() === 'supabase') {
         const url = await uploadPhoto(bucket, file, employeeId);
         onChange(url);
-      } catch (err) {
-        console.error(err);
-        setUploadError('อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง');
-      } finally {
-        setUploading(false);
+        return;
       }
-      return;
-    }
 
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result as string);
-    reader.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onload = () => onChange(reader.result as string);
+      reader.onerror = () => setUploadError('อ่านไฟล์รูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setUploadError('อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+    } finally {
+      setUploading(false);
+    }
   }
 
   if (value) {

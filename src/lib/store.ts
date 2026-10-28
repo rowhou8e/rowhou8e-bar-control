@@ -577,6 +577,7 @@ class Store {
     parQuantity: number;
     quantity: number;
     supplierId: string | null;
+    photoUrl?: string | null;
     actorId: string;
   }) {
     this.update((s) => {
@@ -595,6 +596,7 @@ class Store {
         updatedBy: input.actorId,
         active: true,
         supplierId: input.supplierId,
+        photoUrl: input.photoUrl ?? null,
       };
       this.log('settings_change', input.actorId, input.name, `เพิ่มวัตถุดิบใหม่ในสต๊อก: ${input.name} (${input.unit})`);
       return { ...s, stockItems: [item, ...s.stockItems] };
@@ -603,7 +605,15 @@ class Store {
 
   updateStockItemDetails(
     id: string,
-    patch: { name?: string; categoryId?: string; unit?: string; minQuantity?: number; parQuantity?: number; supplierId?: string | null },
+    patch: {
+      name?: string;
+      categoryId?: string;
+      unit?: string;
+      minQuantity?: number;
+      parQuantity?: number;
+      supplierId?: string | null;
+      photoUrl?: string | null;
+    },
     actorId: string
   ) {
     this.update((s) => {

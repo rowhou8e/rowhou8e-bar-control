@@ -368,6 +368,20 @@ create policy "order_reminders_delete_all"
 -- create policy "employee_photos_authenticated_upload" on storage.objects for insert
 --   with check (bucket_id = 'employee-photos' and auth.role() = 'authenticated');
 
+-- ========================================================================
+-- STOCK ITEM PHOTOS (photo_url บน stock_items) — รันใน SQL editor
+-- ========================================================================
+
+-- alter table public.stock_items add column if not exists photo_url text;
+
+-- insert into storage.buckets (id, name, public) values
+--   ('stock-photos', 'stock-photos', true)
+-- on conflict (id) do nothing;
+
+-- create policy "stock_photos_public_read" on storage.objects for select using (bucket_id = 'stock-photos');
+-- create policy "stock_photos_authenticated_upload" on storage.objects for insert
+--   with check (bucket_id = 'stock-photos' and auth.role() = 'authenticated');
+
 -- ---------------- WORK CALENDAR (ปฏิทินการทำงาน) — เฟส 5 ----------------
 alter table public.employee_weekly_pattern enable row level security;
 alter table public.work_calendar_entries enable row level security;

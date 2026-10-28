@@ -711,6 +711,7 @@ export class LiveStore {
     parQuantity: number;
     quantity: number;
     supplierId: string | null;
+    photoUrl?: string | null;
     actorId: string;
   }) {
     await q.createStockItem(input);
@@ -719,7 +720,15 @@ export class LiveStore {
 
   async updateStockItemDetails(
     id: string,
-    patch: { name?: string; categoryId?: string; unit?: string; minQuantity?: number; parQuantity?: number; supplierId?: string | null },
+    patch: {
+      name?: string;
+      categoryId?: string;
+      unit?: string;
+      minQuantity?: number;
+      parQuantity?: number;
+      supplierId?: string | null;
+      photoUrl?: string | null;
+    },
     actorId: string
   ) {
     await q.updateStockItemDetails(id, patch, actorId);

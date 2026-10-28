@@ -70,6 +70,9 @@ export interface StockItem {
    *  พนักงานเลือกผู้ขายเองตอนสั่งสินค้าไม่ได้อีกต่อไป หน้า "สั่งสินค้า" (/order) ใช้ค่านี้โดยตรง
    *  และซ่อนรายการที่ยังไม่ระบุผู้ขายออกจากรายการที่สั่งได้ */
   supplierId: string | null;
+  /** รูปตัวอย่างวัตถุดิบ (ช่วยแยกรายการชื่อคล้ายกัน) — เพิ่ม/แก้ไขได้ที่หน้า "ตั้งค่าระบบ" ไม่บังคับกรอก
+   *  optional (ไม่ใช่ required field) เพื่อไม่ต้องแก้ไขข้อมูลตัวอย่าง (mock-data.ts) ทุกแถวที่มีอยู่แล้ว */
+  photoUrl?: string | null;
 }
 
 /**
@@ -582,11 +585,20 @@ export interface AppStore {
     parQuantity: number;
     quantity: number;
     supplierId: string | null;
+    photoUrl?: string | null;
     actorId: string;
   }): void | Promise<void>;
   updateStockItemDetails(
     id: string,
-    patch: { name?: string; categoryId?: string; unit?: string; minQuantity?: number; parQuantity?: number; supplierId?: string | null },
+    patch: {
+      name?: string;
+      categoryId?: string;
+      unit?: string;
+      minQuantity?: number;
+      parQuantity?: number;
+      supplierId?: string | null;
+      photoUrl?: string | null;
+    },
     actorId: string
   ): void | Promise<void>;
   deleteStockItem(id: string, actorId: string): void | Promise<void>;

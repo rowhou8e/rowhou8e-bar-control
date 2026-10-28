@@ -253,6 +253,7 @@ export async function fetchStockItems(): Promise<StockItem[]> {
     updatedBy: r.updated_by,
     active: r.active,
     supplierId: r.supplier_id,
+    photoUrl: r.photo_url ?? null,
   }));
 }
 
@@ -295,6 +296,7 @@ export async function createStockItem(input: {
   parQuantity: number;
   quantity: number;
   supplierId: string | null;
+  photoUrl?: string | null;
   actorId: string;
 }): Promise<StockItem> {
   const sb = getSupabaseClient();
@@ -308,6 +310,7 @@ export async function createStockItem(input: {
       par_quantity: input.parQuantity,
       quantity: input.quantity,
       supplier_id: input.supplierId,
+      photo_url: input.photoUrl ?? null,
       status: 'normal',
       updated_by: input.actorId,
       active: true,
@@ -338,13 +341,22 @@ export async function createStockItem(input: {
     updatedBy: data.updated_by,
     active: data.active,
     supplierId: data.supplier_id,
+    photoUrl: data.photo_url ?? null,
   };
 }
 
-/** แก้ไขข้อมูลวัตถุดิบ (ชื่อ/หมวดหมู่/หน่วย/จำนวนขั้นต่ำ/จำนวนที่ควรมี) — แยกจาก adjustStockQuantity ซึ่งใช้ปรับ "จำนวนคงเหลือ" เท่านั้น */
+/** แก้ไขข้อมูลวัตถุดิบ (ชื่อ/หมวดหมู่/หน่วย/จำนวนขั้นต่ำ/จำนวนที่ควรมี/รูป) — แยกจาก adjustStockQuantity ซึ่งใช้ปรับ "จำนวนคงเหลือ" เท่านั้น */
 export async function updateStockItemDetails(
   id: string,
-  patch: { name?: string; categoryId?: string; unit?: string; minQuantity?: number; parQuantity?: number; supplierId?: string | null },
+  patch: {
+    name?: string;
+    categoryId?: string;
+    unit?: string;
+    minQuantity?: number;
+    parQuantity?: number;
+    supplierId?: string | null;
+    photoUrl?: string | null;
+  },
   actorId: string
 ) {
   const sb = getSupabaseClient();
@@ -355,6 +367,7 @@ export async function updateStockItemDetails(
   if (patch.minQuantity !== undefined) dbPatch.min_quantity = patch.minQuantity;
   if (patch.parQuantity !== undefined) dbPatch.par_quantity = patch.parQuantity;
   if (patch.supplierId !== undefined) dbPatch.supplier_id = patch.supplierId;
+  if (patch.photoUrl !== undefined) dbPatch.photo_url = patch.photoUrl;
 
   const { data: before } = await sb.from('stock_items').select('name').eq('id', id).single();
   const { error } = await sb.from('stock_items').update(dbPatch).eq('id', id);
@@ -2064,7 +2077,11 @@ export async function fetchHistoryLogs(filters?: { actorId?: string; actionType?
  * ตัวอย่างการอัปโหลดรูปภาพขึ้น Supabase Storage
  * ใช้แทนการเก็บ data URL แบบใน mock store
  */
-export async function uploadPhoto(bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos' | 'employee-photos', file: File, employeeId: string) {
+export async function uploadPhoto(
+  bucket: 'checklist-photos' | 'production-photos' | 'purchase-photos' | 'employee-photos' | 'stock-photos',
+  file: File,
+  employeeId: string
+) {
   const sb = getSupabaseClient();
   const path = `${employeeId}/${Date.now()}-${file.name}`;
   const { error } = await sb.storage.from(bucket).upload(path, file);

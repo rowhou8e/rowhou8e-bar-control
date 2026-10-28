@@ -547,6 +547,9 @@ export function detectPriceChanges(orders: PurchaseOrder[]): PriceChangeAlert[] 
     if (po.status === 'cancelled') continue;
     for (const it of po.items) {
       if (it.unitPrice <= 0) continue;
+      // หน่วย "บาท" ไม่ใช่หน่วยวัดจริง (มักกรอกเป็นยอดเงินรวมแทนปริมาณ เช่น ผักชี/กะเพรา/ต้นหอมที่ซื้อแบบกะ)
+      // "ราคาต่อหน่วย" ของรายการแบบนี้จึงไม่มีความหมายให้เทียบ และทำให้แจ้งเตือนเพี้ยนเป็นหลักพัน% ข้ามไปเลย
+      if (it.unit === 'บาท') continue;
       const key = purchaseOrderItemKey(it);
       const list = map.get(key);
       const obs: Obs = { date: po.orderDate, unitPrice: it.unitPrice, unit: it.unit, itemName: it.itemName };

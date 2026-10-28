@@ -208,13 +208,23 @@ export default function PurchaseOrderDetailPage() {
         </p>
       )}
           <div className="space-y-2">
-        {po.items.map((it) => (
+        {po.items.map((it) => {
+          const stockPhotoUrl = it.stockItemId ? stockItems.find((s) => s.id === it.stockItemId)?.photoUrl : null;
+          return (
           <div key={it.id} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs last:border-0 last:pb-0">
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-gray-800">{it.itemName}</p>
-              <p className="mt-1 text-gray-400">
-                {it.quantity} {it.unit}
-              </p>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              {stockPhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={stockPhotoUrl} alt={it.itemName} className="h-7 w-7 shrink-0 rounded-md object-cover" />
+              ) : (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-50 text-xs text-gray-300">📦</span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-gray-800">{it.itemName}</p>
+                <p className="mt-1 text-gray-400">
+                  {it.quantity} {it.unit}
+                </p>
+              </div>
             </div>
             {canEditPrice ? (
               <div className="flex shrink-0 items-center gap-1">
@@ -243,7 +253,8 @@ export default function PurchaseOrderDetailPage() {
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2">
             <p className="text-xs font-semibold text-gray-500">รวมทั้งหมด</p>

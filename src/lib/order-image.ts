@@ -106,6 +106,18 @@ async function ensureFontsLoaded(): Promise<void> {
   }
 }
 
+/** โหลดรูปวัตถุดิบ (ถ้ามี) มาเตรียมวาดลง canvas — พลาดรูปไหนก็ข้ามรูปนั้นไป ไม่บล็อกการสร้างภาพทั้งใบ
+ *  ต้องตั้ง crossOrigin ไว้ ไม่งั้น canvas จะ "tainted" ส่งออกเป็นรูป (toBlob) ไม่ได้ เพราะรูปมาจากคนละโดเมน (Supabase Storage) */
+function loadImageSafe(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 async function renderPurchaseOrderImageBlob(
   po: PurchaseOrder,
   supplier: Supplier | undefined,
@@ -115,6 +127,21 @@ async function renderPurchaseOrderImageBlob(
 ): Promise<Blob | null> {
   if (typeof document === 'undefined') return null;
   await ensureFontsLoaded();
+
+  // โหลดรูปวัตถุดิบของแต่ละรายการ (ถ้ามี) ล่วงหน้าแบบขนาน ก่อนเริ่มวาด — รูปซ้ำ (วัตถุดิบเดิมหลายแถว) โหลดครั้งเดียว
+  const photoUrlByStockItemId = new Map<string, string>();
+  po.items.forEach((it) => {
+    if (!it.stockItemId) return;
+    const stockItem = stockItems.find((s) => s.id === it.stockItemId);
+    if (stockItem?.photoUrl) photoUrlByStockItemId.set(it.stockItemId, stockItem.photoUrl);
+  });
+  const loadedImages = new Map<string, HTMLImageElement>();
+  await Promise.all(
+    [...photoUrlByStockItemId.entries()].map(async ([stockItemId, url]) => {
+      const img = await loadImageSafe(url);
+      if (img) loadedImages.set(stockItemId, img);
+    })
+  );
 
   // สีประจำผู้ขาย — ใช้ไล่สีแถบบน/การ์ดข้อมูลผู้ขาย/หัวตาราง ให้ตรงกับหน้าจออื่น ๆ ในระบบ
   const accent = supplierColor(supplier);
@@ -141,9 +168,14 @@ async function renderPurchaseOrderImageBlob(
   const accentCardH = supplierH + 26;
   const accentTextX = marginX + 16;
 
+  // คอลัมน์รูปย่อวัตถุดิบหน้าชื่อแต่ละรายการ — กันพื้นที่ไว้เท่ากันทุกแถว (ไม่ว่าแถวนั้นจะมีรูปจริงหรือไม่)
+  // เพื่อให้ตารางจัดแนวเรียบ ไม่ขยับไปมาตามว่ามีรูปหรือเปล่า
+  const THUMB = 30;
+  const THUMB_COL_W = THUMB + 12;
+
   const col = {
-    nameX: marginX,
-    nameW: 430,
+    nameX: marginX + THUMB_COL_W,
+    nameW: 430 - THUMB_COL_W,
     qtyRight: marginX + 560,
     subtotalRight: W - marginX,
   };
@@ -269,7 +301,7 @@ async function renderPurchaseOrderImageBlob(
   ctx.font = `700 15px ${FONT_FAMILY}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.fillText(`รายการสินค้า (${po.items.length} รายการ)`, col.nameX + 10, tableY + tableHeaderH / 2);
+  ctx.fillText(`รายการสินค้า (${po.items.length} รายการ)`, marginX + 10, tableY + tableHeaderH / 2);
   ctx.textAlign = 'right';
   ctx.fillText('จำนวน', col.qtyRight, tableY + tableHeaderH / 2);
   ctx.fillText('รวม (บาท)', col.subtotalRight - 10, tableY + tableHeaderH / 2);
@@ -286,7 +318,7 @@ async function renderPurchaseOrderImageBlob(
       ctx.font = `700 14px ${FONT_FAMILY}`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${row.name} (${row.count} รายการ)`, col.nameX + 10, rowY + row.h / 2);
+      ctx.fillText(`${row.name} (${row.count} รายการ)`, marginX + 10, rowY + row.h / 2);
       ctx.textBaseline = 'alphabetic';
 
       ctx.strokeStyle = BORDER;
@@ -309,6 +341,38 @@ async function renderPurchaseOrderImageBlob(
     const centerY = rowY + rowH / 2;
     const lineH = 21;
     const startY = centerY - ((lines.length - 1) * lineH) / 2;
+
+    // รูปย่อวัตถุดิบ — มีรูปก็วาดรูป (ครอปเต็มกรอบ มุมมน) ไม่มีก็วาดกล่องเทาพร้อมไอคอน 📦 แทน
+    const thumbX = marginX + 6;
+    const thumbY = centerY - THUMB / 2;
+    const thumbImg = it.stockItemId ? loadedImages.get(it.stockItemId) : undefined;
+    if (thumbImg) {
+      ctx.save();
+      const r = 6;
+      ctx.beginPath();
+      ctx.moveTo(thumbX + r, thumbY);
+      ctx.arcTo(thumbX + THUMB, thumbY, thumbX + THUMB, thumbY + THUMB, r);
+      ctx.arcTo(thumbX + THUMB, thumbY + THUMB, thumbX, thumbY + THUMB, r);
+      ctx.arcTo(thumbX, thumbY + THUMB, thumbX, thumbY, r);
+      ctx.arcTo(thumbX, thumbY, thumbX + THUMB, thumbY, r);
+      ctx.closePath();
+      ctx.clip();
+      const scale = Math.max(THUMB / thumbImg.width, THUMB / thumbImg.height);
+      const dw = thumbImg.width * scale;
+      const dh = thumbImg.height * scale;
+      ctx.drawImage(thumbImg, thumbX - (dw - THUMB) / 2, thumbY - (dh - THUMB) / 2, dw, dh);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = ROW_ALT;
+      ctx.fillRect(thumbX, thumbY, THUMB, THUMB);
+      ctx.fillStyle = '#C8C8C8';
+      ctx.font = `15px ${FONT_FAMILY}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('📦', thumbX + THUMB / 2, thumbY + THUMB / 2 + 1);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
 
     ctx.fillStyle = TEXT_DARK;
     ctx.font = `600 16px ${FONT_FAMILY}`;

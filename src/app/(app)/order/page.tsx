@@ -682,6 +682,12 @@ export default function OrderPage() {
                                   onChange={() => (isSelected ? setItemQty(it.id, '') : setItemQty(it.id, '1'))}
                                   className="h-4 w-4 shrink-0"
                                 />
+                                {it.photoUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={it.photoUrl} alt={it.name} className="h-7 w-7 shrink-0 rounded-md object-cover" />
+                                ) : (
+                                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-50 text-xs text-gray-300">📦</span>
+                                )}
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-xs font-bold text-gray-800">{it.name}</p>
                                   <p className="text-[11px] text-gray-400">{it.unit}</p>

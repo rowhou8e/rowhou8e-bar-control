@@ -33,6 +33,7 @@ export default function PurchaseOrderDetailPage() {
   const [newItemPrice, setNewItemPrice] = useState('');
   const [addingItem, setAddingItem] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
+  const [quantityUpdatingId, setQuantityUpdatingId] = useState<string | null>(null);
 
   // เปิดลิงก์ตรงมาที่ใบสั่งซื้อเก่าที่ยังไม่อยู่ในช่วงที่โหลดเริ่มต้น (เช่น จากรูป/ข้อความที่เคยแชร์ไว้)
   // — โหลดประวัติทั้งหมดให้อัตโนมัติเงียบๆ ก่อนสรุปว่า "ไม่พบ" จริงๆ (ดู loadAllPurchaseOrderHistory ใน types.ts)
@@ -118,6 +119,28 @@ export default function PurchaseOrderDetailPage() {
     if (!employee) return;
     if (typeof window !== 'undefined' && !window.confirm('ยกเลิกใบสั่งซื้อนี้? รายการเสนอซื้อต้นทางจะกลับไปเป็นสถานะ "อนุมัติแล้ว"')) return;
     store.updatePurchaseOrderStatus(po!.id, 'cancelled', employee.id);
+  }
+
+  async function commitQuantity(itemId: string, quantity: number) {
+    if (!employee || !po) return;
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    const item = po.items.find((it) => it.id === itemId);
+    if (!item || item.quantity === quantity) return;
+    setQuantityUpdatingId(itemId);
+    try {
+      await store.updatePurchaseOrderItemQuantity(po.id, itemId, quantity, employee.id);
+    } finally {
+      setQuantityUpdatingId(null);
+    }
+  }
+
+  function handleQuantityInputCommit(itemId: string, rawValue: string) {
+    void commitQuantity(itemId, Number(rawValue));
+  }
+
+  function handleQuantityStep(itemId: string, currentQuantity: number, delta: number) {
+    const next = Math.round(Math.max(0.01, currentQuantity + delta) * 100) / 100;
+    void commitQuantity(itemId, next);
   }
 
   function handleTotalPriceCommit(itemId: string, quantity: number, rawValue: string) {
@@ -221,14 +244,48 @@ export default function PurchaseOrderDetailPage() {
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-gray-800">{it.itemName}</p>
-                <p className="mt-1 text-gray-400">
-                  {it.quantity} {it.unit}
-                </p>
+                {po.status === 'draft' ? (
+                  <div className="mt-1 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityStep(it.id, it.quantity, -1)}
+                      disabled={quantityUpdatingId === it.id}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-gray-200 text-xs font-bold text-gray-500 active:bg-gray-50 disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <input
+                      key={`${it.id}-qty-${it.quantity}`}
+                      type="number"
+                      inputMode="decimal"
+                      min={0.01}
+                      step="0.01"
+                      defaultValue={it.quantity}
+                      onBlur={(e) => handleQuantityInputCommit(it.id, e.target.value)}
+                      disabled={quantityUpdatingId === it.id}
+                      className="w-14 rounded border border-gray-200 px-1 py-0.5 text-center text-[11px] font-bold text-gray-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityStep(it.id, it.quantity, 1)}
+                      disabled={quantityUpdatingId === it.id}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-gray-200 text-xs font-bold text-gray-500 active:bg-gray-50 disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                    <span className="text-gray-400">{it.unit}</span>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-gray-400">
+                    {it.quantity} {it.unit}
+                  </p>
+                )}
               </div>
             </div>
             {canEditPrice ? (
               <div className="flex shrink-0 items-center gap-1">
                 <input
+                  key={`${it.id}-price-${it.quantity}-${it.unitPrice}`}
                   type="number"
                   inputMode="decimal"
                   min={0}

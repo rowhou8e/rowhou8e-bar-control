@@ -888,6 +888,11 @@ export class LiveStore {
     await this.refetchPurchaseOrdersAndRequests();
   }
 
+  async updatePurchaseOrderItemQuantity(purchaseOrderId: string, itemId: string, quantity: number, actorId: string) {
+    await q.updatePurchaseOrderItemQuantity(purchaseOrderId, itemId, quantity, actorId);
+    await this.refetchPurchaseOrdersAndRequests();
+  }
+
   async addPurchaseOrderItem(input: {
     purchaseOrderId: string;
     stockItemId: string | null;

@@ -295,6 +295,7 @@ export type HistoryActionType =
   | 'po_create' // สร้าง/รวมใบสั่งซื้อ
   | 'po_status_change' // เปลี่ยนสถานะใบสั่งซื้อ (ส่งแล้ว/ยืนยันแล้ว/รับแล้ว/ยกเลิก)
   | 'po_price_update' // แก้ไขราคาต่อหน่วยของรายการในใบสั่งซื้อ (ระหว่างสถานะร่าง)
+  | 'po_item_quantity_update' // แก้ไขจำนวนของรายการในใบสั่งซื้อฉบับร่าง (เพิ่ม/ลดจำนวนก่อนส่งให้ผู้ขาย)
   | 'po_item_add' // เพิ่มรายการวัตถุดิบใหม่ในใบสั่งซื้อฉบับร่าง
   | 'po_item_remove' // ลบรายการวัตถุดิบออกจากใบสั่งซื้อฉบับร่าง
   | 'cash_report_submit' // บันทึกรายงานเงินสดปิดร้าน — เฟส 3
@@ -688,6 +689,8 @@ export interface AppStore {
    */
   updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, actorId: string): void | Promise<void>;
   updatePurchaseOrderItemPrice(purchaseOrderId: string, itemId: string, unitPrice: number, actorId: string): void | Promise<void>;
+  /** แก้ไขจำนวนของรายการวัตถุดิบในใบสั่งซื้อ — เพิ่ม/ลดจำนวนได้เฉพาะขณะใบสั่งซื้อยังเป็นฉบับร่าง (เหมือนกับเพิ่ม/ลบรายการ) */
+  updatePurchaseOrderItemQuantity(purchaseOrderId: string, itemId: string, quantity: number, actorId: string): void | Promise<void>;
   /** เพิ่มรายการวัตถุดิบใหม่เข้าใบสั่งซื้อฉบับร่าง (ยังไม่ส่งให้ผู้ขาย) — ตั้งราคาต่อหน่วยได้เอง */
   addPurchaseOrderItem(input: {
     purchaseOrderId: string;

@@ -898,6 +898,32 @@ class Store {
     });
   }
 
+  /** แก้ไขจำนวนของรายการวัตถุดิบในใบสั่งซื้อ — เพิ่ม/ลดจำนวนได้เฉพาะขณะใบสั่งซื้อยังเป็นฉบับร่างเท่านั้น (เหมือนกับเพิ่ม/ลบรายการ) */
+  updatePurchaseOrderItemQuantity(purchaseOrderId: string, itemId: string, quantity: number, actorId: string) {
+    this.update((s) => {
+      const order = s.purchaseOrders.find((po) => po.id === purchaseOrderId);
+      if (!order || order.status !== 'draft') return s;
+      const item = order.items.find((it) => it.id === itemId);
+      if (!item) return s;
+
+      const purchaseOrders = s.purchaseOrders.map((po) =>
+        po.id === purchaseOrderId
+          ? { ...po, items: po.items.map((it) => (it.id === itemId ? { ...it, quantity } : it)) }
+          : po
+      );
+
+      const supplier = s.suppliers.find((x) => x.id === order.supplierId);
+      this.log(
+        'po_item_quantity_update',
+        actorId,
+        `ใบสั่งซื้อ · ${supplier?.name ?? order.supplierId}`,
+        `แก้ไขจำนวน "${item.itemName}" จาก ${item.quantity} เป็น ${quantity} ${item.unit}`
+      );
+
+      return { ...s, purchaseOrders };
+    });
+  }
+
   addPurchaseOrderItem(input: {
     purchaseOrderId: string;
     stockItemId: string | null;

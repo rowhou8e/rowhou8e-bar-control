@@ -657,3 +657,18 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ขยาย history_logs.action_type อีกครั้ง — เพิ่ม 'po_item_add'/'po_item_remove' ที่โค้ด (queries.ts) ใช้บันทึกอยู่แล้ว
+-- มาตั้งแต่ตอนเพิ่มฟีเจอร์ "เพิ่ม/ลบรายการในใบสั่งซื้อฉบับร่าง" แต่ไม่เคยถูกเพิ่มเข้า constraint นี้มาก่อน — ผลคือทุกครั้งที่
+-- เพิ่ม/ลบรายการ การ insert history_logs จะชนกับ constraint นี้แล้วถูก Supabase ปฏิเสธเงียบๆ (โค้ดไม่ได้เช็ก error ของ
+-- insert นี้) ทำให้ไม่มีการบันทึกประวัติเลยสักครั้งตั้งแต่ฟีเจอร์นี้เปิดใช้งาน (ตรวจสอบแล้วพบว่า history_logs มี
+-- po_price_update 635 แถว แต่ po_item_add/po_item_remove มี 0 แถว) และเพิ่ม 'po_item_quantity_update' สำหรับฟีเจอร์
+-- ใหม่ "แก้ไขจำนวนในใบสั่งซื้อฉบับร่าง" ไปพร้อมกันเลย
+alter table public.history_logs drop constraint if exists history_logs_action_type_check;
+alter table public.history_logs add constraint history_logs_action_type_check check (action_type in (
+  'checklist_submit', 'production_log', 'lot_status_change', 'stock_adjust',
+  'waste_report', 'purchase_create', 'purchase_approve', 'purchase_receive',
+  'settings_change', 'supplier_change', 'po_create', 'po_status_change',
+  'cash_report_submit', 'cash_report_edit', 'order_reminder_send', 'order_reminder_ack',
+  'po_price_update', 'calendar_change', 'po_item_add', 'po_item_remove', 'po_item_quantity_update'
+));

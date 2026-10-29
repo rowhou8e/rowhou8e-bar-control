@@ -1252,6 +1252,38 @@ export async function updatePurchaseOrderItemPrice(purchaseOrderId: string, item
   });
 }
 
+/** แก้ไขจำนวนของรายการวัตถุดิบในใบสั่งซื้อ — เพิ่ม/ลดจำนวนได้เฉพาะขณะใบสั่งซื้อยังเป็นฉบับร่างเท่านั้น (เหมือนกับเพิ่ม/ลบรายการ) */
+export async function updatePurchaseOrderItemQuantity(purchaseOrderId: string, itemId: string, quantity: number, actorId: string) {
+  const sb = getSupabaseClient();
+
+  const { data: order, error: orderError } = await sb
+    .from('purchase_orders')
+    .select('id, status, supplier_id')
+    .eq('id', purchaseOrderId)
+    .single();
+  if (orderError) throw orderError;
+  if (!order) throw new Error('ไม่พบใบสั่งซื้อนี้');
+  if (order.status !== 'draft') throw new Error('แก้ไขจำนวนได้เฉพาะใบสั่งซื้อที่ยังเป็นฉบับร่างเท่านั้น');
+
+  const { data: item, error: itemError } = await sb
+    .from('purchase_order_items')
+    .select('item_name, unit, quantity')
+    .eq('id', itemId)
+    .single();
+  if (itemError) throw itemError;
+
+  const { error } = await sb.from('purchase_order_items').update({ quantity }).eq('id', itemId);
+  if (error) throw error;
+
+  const { data: supplier } = await sb.from('suppliers').select('name').eq('id', order.supplier_id).single();
+  await sb.from('history_logs').insert({
+    action_type: 'po_item_quantity_update',
+    actor_id: actorId,
+    target_label: `ใบสั่งซื้อ · ${supplier?.name ?? order.supplier_id}`,
+    detail: `แก้ไขจำนวน "${item?.item_name ?? itemId}" จาก ${item?.quantity ?? '-'} เป็น ${quantity} ${item?.unit ?? ''}`,
+  });
+}
+
 /** เพิ่มรายการวัตถุดิบใหม่เข้าใบสั่งซื้อฉบับร่าง (ยังไม่ส่งให้ผู้ขาย) — ตั้งราคาต่อหน่วยได้เอง */
 export async function addPurchaseOrderItem(input: {
   purchaseOrderId: string;

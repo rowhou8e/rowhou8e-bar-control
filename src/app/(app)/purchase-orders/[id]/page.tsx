@@ -32,6 +32,9 @@ export default function PurchaseOrderDetailPage() {
   const [newItemQty, setNewItemQty] = useState('1');
   const [newItemPrice, setNewItemPrice] = useState('');
   const [addingItem, setAddingItem] = useState(false);
+  const [newMiscName, setNewMiscName] = useState('');
+  const [newMiscPrice, setNewMiscPrice] = useState('');
+  const [addingMisc, setAddingMisc] = useState(false);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
   const [quantityUpdatingId, setQuantityUpdatingId] = useState<string | null>(null);
 
@@ -96,6 +99,33 @@ export default function PurchaseOrderDetailPage() {
       setNewItemPrice('');
     } finally {
       setAddingItem(false);
+    }
+  }
+
+  // เพิ่มรายการเบ็ดเตล็ดที่ไม่ได้ผูกกับวัตถุดิบในสต๊อก (เช่น ค่าขนส่ง/ของจุกจิกที่ผู้ขายคิดรวมมาเป็นยอดเดียวไม่แยกหน่วย)
+  // ใช้วิธีเดียวกับตอนสร้างใบสั่งซื้อใหม่ (ปุ่ม "ค่าใช้จ่ายอื่นๆ" ในหน้าสั่งของ): quantity คงที่ 1, unit = 'รายการ',
+  // แล้วใส่ยอดรวมทั้งหมดลงใน unitPrice ไปเลย — ไม่ต้องเพิ่ม field/ประเภทข้อมูลใหม่ ใช้ addPurchaseOrderItem เดิมได้
+  async function handleAddMiscItem() {
+    if (!employee || !po) return;
+    const name = newMiscName.trim();
+    const amount = Number(newMiscPrice);
+    if (!name) return;
+    if (!Number.isFinite(amount) || amount < 0) return;
+    setAddingMisc(true);
+    try {
+      await store.addPurchaseOrderItem({
+        purchaseOrderId: po.id,
+        stockItemId: null,
+        itemName: name,
+        quantity: 1,
+        unit: 'รายการ',
+        unitPrice: amount,
+        actorId: employee.id,
+      });
+      setNewMiscName('');
+      setNewMiscPrice('');
+    } finally {
+      setAddingMisc(false);
     }
   }
 
@@ -375,6 +405,39 @@ export default function PurchaseOrderDetailPage() {
                 </div>
               </div>
             )}
+
+            <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+              <p className="text-xs font-bold text-gray-700">หรือเพิ่มรายการเบ็ดเตล็ด (ไม่มีหน่วย/ไม่ได้อยู่ในสต๊อก)</p>
+              <p className="text-[11px] text-gray-400">เช่น ค่าขนส่ง หรือของจุกจิกที่ผู้ขายคิดรวมมาเป็นยอดเดียว — ใส่แค่ชื่อกับยอดรวม ไม่ต้องระบุหน่วย/จำนวน</p>
+              <input
+                type="text"
+                value={newMiscName}
+                onChange={(e) => setNewMiscName(e.target.value)}
+                placeholder="ชื่อรายการ เช่น ค่าขนส่ง"
+                className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs text-gray-700"
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={newMiscPrice}
+                  onChange={(e) => setNewMiscPrice(e.target.value)}
+                  placeholder="ยอดรวม"
+                  className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-right text-xs text-gray-700"
+                />
+                <span className="text-[11px] text-gray-400">บาท</span>
+                <button
+                  type="button"
+                  onClick={handleAddMiscItem}
+                  disabled={!newMiscName.trim() || addingMisc}
+                  className="ml-auto shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white active:bg-brand-700 disabled:opacity-50"
+                >
+                  {addingMisc ? 'กำลังเพิ่ม...' : '+ เพิ่ม'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
         </div>

@@ -28,6 +28,9 @@ export default function OrderPage() {
 
   const [qty, setQty] = useState<Record<string, string>>({});
   const [priceOverride, setPriceOverride] = useState<Record<string, string>>({});
+  // รายการที่ยังไม่รู้จำนวนแน่นอน ตอนสั่งขอใส่แค่ "ราคารวม" ที่จะจ่ายแทนไปก่อน (เลือกได้อย่างใดอย่างหนึ่งระหว่างจำนวน/ราคารวม
+  // ไม่ต้องรู้ทั้งคู่) — เก็บจำนวน=1 ไว้ก่อนตอนบันทึก แล้วไปกรอกจำนวนจริงทีหลังตอนแก้ใบสั่งซื้อฉบับร่าง (ใช้ตัว +/- ที่มีอยู่แล้ว)
+  const [priceOnlyMode, setPriceOnlyMode] = useState<Record<string, boolean>>({});
   const [orderDate, setOrderDate] = useState(toDateStr(now));
   const [activeSupplierId, setActiveSupplierId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -113,11 +116,26 @@ export default function OrderPage() {
     setQty((q) => ({ ...q, [id]: value }));
   }
 
+  // สลับโหมด "ไม่รู้จำนวน ใส่แค่ราคารวม" ของรายการนั้น — ล้างช่องราคาทุกครั้งที่สลับ เพื่อไม่ให้ราคาต่อหน่วยที่เติมอัตโนมัติ
+  // (จากประวัติการสั่งครั้งก่อน) ค้างมาปนกับราคารวมที่พนักงานจะพิมพ์เอง หรือย้อนกลับไปเป็นราคาต่อหน่วยที่ไม่ตรงบริบท
+  function togglePriceOnlyMode(id: string) {
+    setPriceOnlyMode((m) => ({ ...m, [id]: !m[id] }));
+    setPriceOverride((p) => {
+      const next = { ...p };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function isItemSelected(it: StockItem): boolean {
+    return priceOnlyMode[it.id] ? Number(priceOverride[it.id]) > 0 : Number(qty[it.id]) > 0;
+  }
+
   function selectAllFiltered() {
     setQty((q) => {
       const next = { ...q };
       for (const it of filteredItems) {
-        if (!(Number(next[it.id]) > 0)) next[it.id] = '1';
+        if (!isItemSelected(it)) next[it.id] = '1';
       }
       return next;
     });
@@ -129,13 +147,23 @@ export default function OrderPage() {
       for (const it of filteredItems) delete next[it.id];
       return next;
     });
+    setPriceOnlyMode((m) => {
+      const next = { ...m };
+      for (const it of filteredItems) delete next[it.id];
+      return next;
+    });
+    setPriceOverride((p) => {
+      const next = { ...p };
+      for (const it of filteredItems) delete next[it.id];
+      return next;
+    });
   }
 
   function selectedCountForSupplier(supplierId: string) {
-    return orderableItems.filter((it) => it.supplierId === supplierId && Number(qty[it.id]) > 0).length;
+    return orderableItems.filter((it) => it.supplierId === supplierId && isItemSelected(it)).length;
   }
 
-  const selectedItems = orderableItems.filter((it) => Number(qty[it.id]) > 0);
+  const selectedItems = orderableItems.filter(isItemSelected);
 
   // แยกรายการที่เลือกไว้ตามผู้ขาย (ผู้ขายถูกกำหนดไว้ล่วงหน้าแล้ว ไม่มีกรณี "ยังไม่ระบุผู้ขาย" อีกต่อไป)
   // — คงไว้ทั้งหมด ไม่ใช่แค่ผู้ขายที่กำลังดูอยู่ เพราะพนักงานสลับแท็บผู้ขายไปมาเลือกของหลายเจ้าในครั้งเดียวได้
@@ -148,6 +176,7 @@ export default function OrderPage() {
   const groupList = Array.from(groups.entries());
 
   function itemTotal(it: StockItem) {
+    if (priceOnlyMode[it.id]) return Number(priceOverride[it.id]) || 0;
     return (Number(qty[it.id]) || 0) * (Number(effectivePrice(it)) || 0);
   }
 
@@ -185,14 +214,27 @@ export default function OrderPage() {
       ]);
       for (const supplierId of supplierIds) {
         const stockGroup = groupList.find(([id]) => id === supplierId)?.[1] ?? [];
-        const orderItems = stockGroup.map((it) => ({
-          stockItemId: it.id,
-          itemName: it.name,
-          quantity: Number(qty[it.id]) || 0,
-          unit: it.unit,
-          unitPrice: Number(effectivePrice(it)) || 0,
-          sourcePurchaseRequestId: null,
-        }));
+        // รายการที่สั่งแบบ "ยังไม่รู้จำนวน ใส่แค่ราคารวม" — บันทึกจำนวน = 1 ไปก่อน (หน่วยเดิมของวัตถุดิบ) แล้วเอาราคารวม
+        // ที่พนักงานพิมพ์มาใส่เป็น unitPrice ตรงๆ (1 × ยอดรวม = ยอดรวม พอดี) ไปกรอกจำนวนจริงทีหลังตอนแก้ใบสั่งซื้อฉบับร่าง
+        const orderItems = stockGroup.map((it) =>
+          priceOnlyMode[it.id]
+            ? {
+                stockItemId: it.id,
+                itemName: it.name,
+                quantity: 1,
+                unit: it.unit,
+                unitPrice: Number(priceOverride[it.id]) || 0,
+                sourcePurchaseRequestId: null,
+              }
+            : {
+                stockItemId: it.id,
+                itemName: it.name,
+                quantity: Number(qty[it.id]) || 0,
+                unit: it.unit,
+                unitPrice: Number(effectivePrice(it)) || 0,
+                sourcePurchaseRequestId: null,
+              }
+        );
         const expenseItems = customItems
           .filter((c) => c.supplierId === supplierId)
           .map((c) => ({
@@ -668,7 +710,8 @@ export default function OrderPage() {
                         <p className="mb-1.5 text-[11px] font-bold text-gray-400">{cat?.name ?? catId}</p>
                         <div className="space-y-1.5">
                           {items.map((it) => {
-                            const isSelected = Number(qty[it.id]) > 0;
+                            const isSelected = isItemSelected(it);
+                            const priceOnly = !!priceOnlyMode[it.id];
                             return (
                               <div
                                 key={it.id}
@@ -679,7 +722,19 @@ export default function OrderPage() {
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  onChange={() => (isSelected ? setItemQty(it.id, '') : setItemQty(it.id, '1'))}
+                                  onChange={() => {
+                                    if (isSelected) {
+                                      setItemQty(it.id, '');
+                                      setPriceOnlyMode((m) => ({ ...m, [it.id]: false }));
+                                      setPriceOverride((p) => {
+                                        const next = { ...p };
+                                        delete next[it.id];
+                                        return next;
+                                      });
+                                    } else {
+                                      setItemQty(it.id, '1');
+                                    }
+                                  }}
                                   className="h-4 w-4 shrink-0"
                                 />
                                 {it.photoUrl ? (
@@ -692,23 +747,40 @@ export default function OrderPage() {
                                   <p className="truncate text-xs font-bold text-gray-800">{it.name}</p>
                                   <p className="text-[11px] text-gray-400">{it.unit}</p>
                                 </div>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={qty[it.id] ?? ''}
-                                  onChange={(e) => setItemQty(it.id, e.target.value)}
-                                  placeholder="จำนวน"
-                                  className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
-                                />
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={effectivePrice(it)}
-                                  onChange={(e) => setPriceOverride((p) => ({ ...p, [it.id]: e.target.value }))}
-                                  placeholder="ราคา"
-                                  title="ราคาต่อหน่วย (บาท)"
-                                  className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
-                                />
+                                <div className="flex shrink-0 flex-col items-end gap-0.5">
+                                  <div className="flex gap-2">
+                                    {priceOnly ? (
+                                      <span className="flex h-[30px] w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-200 text-[10px] text-gray-400">
+                                        ยังไม่ระบุ
+                                      </span>
+                                    ) : (
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={qty[it.id] ?? ''}
+                                        onChange={(e) => setItemQty(it.id, e.target.value)}
+                                        placeholder="จำนวน"
+                                        className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
+                                      />
+                                    )}
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={priceOnly ? (priceOverride[it.id] ?? '') : effectivePrice(it)}
+                                      onChange={(e) => setPriceOverride((p) => ({ ...p, [it.id]: e.target.value }))}
+                                      placeholder={priceOnly ? 'ราคารวม' : 'ราคา'}
+                                      title={priceOnly ? 'ราคารวมที่จะจ่าย (ยังไม่ระบุจำนวน)' : 'ราคาต่อหน่วย (บาท)'}
+                                      className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePriceOnlyMode(it.id)}
+                                    className="text-[10px] font-semibold text-brand-500"
+                                  >
+                                    {priceOnly ? 'ระบุจำนวนแทน' : 'ไม่รู้จำนวน? ใส่ราคารวมแทน'}
+                                  </button>
+                                </div>
                               </div>
                             );
                           })}
@@ -809,7 +881,10 @@ export default function OrderPage() {
                   </div>
                   {items.length > 0 && (
                     <p className="mt-0.5 text-[11px] text-gray-400">
-                      {items.length} รายการ — {items.map((it) => `${it.name} ${qty[it.id] || 0} ${it.unit}`).join(', ')}
+                      {items.length} รายการ —{' '}
+                      {items
+                        .map((it) => (priceOnlyMode[it.id] ? `${it.name} (ยังไม่ระบุจำนวน)` : `${it.name} ${qty[it.id] || 0} ${it.unit}`))
+                        .join(', ')}
                     </p>
                   )}
                   {expenses.length > 0 && (

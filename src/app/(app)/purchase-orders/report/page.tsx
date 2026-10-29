@@ -363,7 +363,7 @@ export default function PurchaseReportPage() {
 
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 12mm; }
+          @page { size: A4 landscape; margin: 10mm; }
         }
       `}</style>
     </div>
@@ -421,11 +421,14 @@ function BreakdownTable({
   return (
     <div className={`rounded-2xl bg-white p-4 shadow-card print:break-inside-avoid print:rounded-none print:border print:border-gray-200 print:p-3 print:shadow-none ${className}`}>
       <p className="mb-2 text-sm font-bold text-gray-800">{title}</p>
-      <div className="space-y-2">
+      {/* จอมือถือ/จอทั่วไป: เรียงเป็นคอลัมน์เดียวลงมาเหมือนเดิม (space-y-2)
+          ตอนปริ้น: จัดเป็นหลายคอลัมน์แบบหนังสือพิมพ์ (เรียงลงมาก่อน แล้วค่อยขึ้นคอลัมน์ถัดไป) ความกว้างคอลัมน์ละ
+          ~78mm — บนกระดาษ A4 แนวนอนจะได้ประมาณ 3 คอลัมน์ ทำให้รายการยาวๆ ไม่เปลืองหน้ากระดาษแนวตั้งเหมือนก่อน */}
+      <div className="space-y-2 print:columns-[78mm] print:gap-x-6 print:space-y-0">
         {rows.map((r) => (
           <div
             key={r.key}
-            className={`flex items-center justify-between border-b border-gray-50 py-1.5 pr-1 text-xs last:border-0 ${
+            className={`flex items-center justify-between border-b border-gray-50 py-1.5 pr-1 text-xs last:border-0 print:break-inside-avoid print:mb-1.5 ${
               r.color ? 'border-l-4 pl-2' : ''
             }`}
             style={r.color ? { borderLeftColor: r.color, backgroundColor: hexToRgba(r.color, 0.05) } : undefined}

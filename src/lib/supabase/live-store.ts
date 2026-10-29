@@ -712,6 +712,7 @@ export class LiveStore {
     quantity: number;
     supplierId: string | null;
     photoUrl?: string | null;
+    packNote?: string | null;
     actorId: string;
   }) {
     await q.createStockItem(input);
@@ -728,6 +729,7 @@ export class LiveStore {
       parQuantity?: number;
       supplierId?: string | null;
       photoUrl?: string | null;
+      packNote?: string | null;
     },
     actorId: string
   ) {

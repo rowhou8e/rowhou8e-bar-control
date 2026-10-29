@@ -73,6 +73,10 @@ export interface StockItem {
   /** รูปตัวอย่างวัตถุดิบ (ช่วยแยกรายการชื่อคล้ายกัน) — เพิ่ม/แก้ไขได้ที่หน้า "ตั้งค่าระบบ" ไม่บังคับกรอก
    *  optional (ไม่ใช่ required field) เพื่อไม่ต้องแก้ไขข้อมูลตัวอย่าง (mock-data.ts) ทุกแถวที่มีอยู่แล้ว */
   photoUrl?: string | null;
+  /** หมายเหตุขนาดบรรจุ/หน่วย เช่น "1 แพ็ค = 24 ขวด" — กันลืมเวลากลับมาดูย้อนหลังว่าหน่วยที่ซื้อ (เช่น "แพ็ค", "ลัง")
+   *  จริงๆ แล้วมีกี่ชิ้นข้างใน ตั้งครั้งเดียวที่หน้า "ตั้งค่าระบบ" แล้วโชว์ทุกที่ที่มีชื่อวัตถุดิบนี้ขึ้น (หน้าสั่งของ/ใบสั่งซื้อ/รายงาน)
+   *  optional เหมือน photoUrl เพื่อไม่ต้องแก้ข้อมูลตัวอย่างเดิมทุกแถว */
+  packNote?: string | null;
 }
 
 /**
@@ -587,6 +591,7 @@ export interface AppStore {
     quantity: number;
     supplierId: string | null;
     photoUrl?: string | null;
+    packNote?: string | null;
     actorId: string;
   }): void | Promise<void>;
   updateStockItemDetails(
@@ -599,6 +604,7 @@ export interface AppStore {
       parQuantity?: number;
       supplierId?: string | null;
       photoUrl?: string | null;
+      packNote?: string | null;
     },
     actorId: string
   ): void | Promise<void>;

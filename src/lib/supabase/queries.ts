@@ -254,6 +254,7 @@ export async function fetchStockItems(): Promise<StockItem[]> {
     active: r.active,
     supplierId: r.supplier_id,
     photoUrl: r.photo_url ?? null,
+    packNote: r.pack_note ?? null,
   }));
 }
 
@@ -297,6 +298,7 @@ export async function createStockItem(input: {
   quantity: number;
   supplierId: string | null;
   photoUrl?: string | null;
+  packNote?: string | null;
   actorId: string;
 }): Promise<StockItem> {
   const sb = getSupabaseClient();
@@ -311,6 +313,7 @@ export async function createStockItem(input: {
       quantity: input.quantity,
       supplier_id: input.supplierId,
       photo_url: input.photoUrl ?? null,
+      pack_note: input.packNote ?? null,
       status: 'normal',
       updated_by: input.actorId,
       active: true,
@@ -342,6 +345,7 @@ export async function createStockItem(input: {
     active: data.active,
     supplierId: data.supplier_id,
     photoUrl: data.photo_url ?? null,
+    packNote: data.pack_note ?? null,
   };
 }
 
@@ -356,6 +360,7 @@ export async function updateStockItemDetails(
     parQuantity?: number;
     supplierId?: string | null;
     photoUrl?: string | null;
+    packNote?: string | null;
   },
   actorId: string
 ) {
@@ -368,6 +373,7 @@ export async function updateStockItemDetails(
   if (patch.parQuantity !== undefined) dbPatch.par_quantity = patch.parQuantity;
   if (patch.supplierId !== undefined) dbPatch.supplier_id = patch.supplierId;
   if (patch.photoUrl !== undefined) dbPatch.photo_url = patch.photoUrl;
+  if (patch.packNote !== undefined) dbPatch.pack_note = patch.packNote;
 
   const { data: before } = await sb.from('stock_items').select('name').eq('id', id).single();
   const { error } = await sb.from('stock_items').update(dbPatch).eq('id', id);

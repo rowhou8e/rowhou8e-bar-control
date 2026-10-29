@@ -79,6 +79,9 @@ type BreakdownRow = {
   amount: number;
   /** สีประจำผู้ขาย — ตั้งเฉพาะมุมมอง "ตามผู้ขาย" เพื่อให้แถบสีตรงกับหน้าสั่งซื้อ/ใบสั่งซื้อ */
   color?: string;
+  /** หมายเหตุขนาดบรรจุของวัตถุดิบ (เช่น "1 แพ็ค = 24 ขวด") — ตั้งเฉพาะมุมมอง "ตามรายการสินค้า" เอาไว้กันลืม
+   *  เวลากลับมาดูรายงานย้อนหลังว่าหน่วยที่ซื้อจริงๆ มีกี่ชิ้นข้างใน */
+  packNote?: string;
 };
 
 export default function PurchaseReportPage() {
@@ -164,6 +167,7 @@ export default function PurchaseReportPage() {
         for (const it of po.items) {
           let key: string;
           let label: string;
+          let packNote: string | undefined;
           if (mode === 'category') {
             const stockItem = it.stockItemId ? stockItems.find((s) => s.id === it.stockItemId) : undefined;
             const category = stockItem ? stockCategories.find((c) => c.id === stockItem.categoryId) : undefined;
@@ -172,6 +176,7 @@ export default function PurchaseReportPage() {
           } else {
             key = it.stockItemId ?? `name:${it.itemName}`;
             label = it.itemName;
+            packNote = (it.stockItemId ? stockItems.find((s) => s.id === it.stockItemId)?.packNote : null) ?? undefined;
           }
           const amount = it.quantity * it.unitPrice;
           const existing = map.get(key);
@@ -180,7 +185,7 @@ export default function PurchaseReportPage() {
             existing.orderCount += 1;
             existing.quantityByUnit![it.unit] = (existing.quantityByUnit![it.unit] ?? 0) + it.quantity;
           } else {
-            map.set(key, { key, label, quantityByUnit: { [it.unit]: it.quantity }, orderCount: 1, amount });
+            map.set(key, { key, label, quantityByUnit: { [it.unit]: it.quantity }, orderCount: 1, amount, packNote });
           }
         }
       }
@@ -446,6 +451,7 @@ function BreakdownTable({
                 {r.orderCount} {countLabel}
                 {total > 0 && ` · ${((r.amount / total) * 100).toFixed(1)}%`}
               </p>
+              {r.packNote && <p className="truncate text-gray-400">📝 {r.packNote}</p>}
             </div>
             <p className="shrink-0 font-bold text-gray-700">{r.amount.toLocaleString()} บาท</p>
           </div>

@@ -262,7 +262,9 @@ export default function PurchaseOrderDetailPage() {
       )}
           <div className="space-y-2">
         {po.items.map((it) => {
-          const stockPhotoUrl = it.stockItemId ? stockItems.find((s) => s.id === it.stockItemId)?.photoUrl : null;
+          const matchedStockItem = it.stockItemId ? stockItems.find((s) => s.id === it.stockItemId) : undefined;
+          const stockPhotoUrl = matchedStockItem?.photoUrl;
+          const stockPackNote = matchedStockItem?.packNote;
           return (
           <div key={it.id} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs last:border-0 last:pb-0">
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -274,6 +276,7 @@ export default function PurchaseOrderDetailPage() {
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-gray-800">{it.itemName}</p>
+                {stockPackNote && <p className="truncate text-[10px] text-gray-400">📝 {stockPackNote}</p>}
                 {po.status === 'draft' ? (
                   <div className="mt-1 flex items-center gap-1">
                     <button

@@ -1127,8 +1127,10 @@ function StockItemsSection({
   employeeId: string;
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const emptyRow = () => ({ name: '', categoryId: stockCategories[0]?.id ?? '', unit: '', supplierId: '' });
-  const [rows, setRows] = useState<{ name: string; categoryId: string; unit: string; supplierId: string }[]>(() => [emptyRow()]);
+  const emptyRow = () => ({ name: '', categoryId: stockCategories[0]?.id ?? '', unit: '', supplierId: '', packNote: '' });
+  const [rows, setRows] = useState<{ name: string; categoryId: string; unit: string; supplierId: string; packNote: string }[]>(() => [
+    emptyRow(),
+  ]);
   const [saving, setSaving] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -1167,7 +1169,10 @@ function StockItemsSection({
     setRows([emptyRow()]);
   }
 
-  function updateRow(index: number, patch: Partial<{ name: string; categoryId: string; unit: string; supplierId: string }>) {
+  function updateRow(
+    index: number,
+    patch: Partial<{ name: string; categoryId: string; unit: string; supplierId: string; packNote: string }>
+  ) {
     setRows((rs) => rs.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
@@ -1192,6 +1197,7 @@ function StockItemsSection({
           categoryId: r.categoryId,
           unit: r.unit.trim(),
           supplierId: r.supplierId || null,
+          packNote: r.packNote.trim() || null,
           // ไม่ใช้ระบบนับจำนวนคงเหลือแล้ว (ดูหน้า "สั่งสินค้า") — ค่าเหล่านี้เก็บไว้เพื่อความเข้ากันได้ของโครงสร้างข้อมูลเท่านั้น
           minQuantity: 0,
           parQuantity: 0,
@@ -1285,6 +1291,12 @@ function StockItemsSection({
                     </option>
                   ))}
                 </select>
+                <input
+                  value={row.packNote}
+                  onChange={(e) => updateRow(i, { packNote: e.target.value })}
+                  placeholder="หมายเหตุขนาดบรรจุ เช่น 1 แพ็ค = 24 ขวด (ไม่บังคับ)"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand-400"
+                />
               </div>
             ))}
           </div>
@@ -1381,6 +1393,7 @@ function StockItemRow({
   const [unit, setUnit] = useState(item.unit);
   const [supplierId, setSupplierId] = useState(item.supplierId ?? '');
   const [photoUrl, setPhotoUrl] = useState(item.photoUrl ?? null);
+  const [packNote, setPackNote] = useState(item.packNote ?? '');
 
   function handleSave() {
     if (!name.trim() || !unit.trim()) return;
@@ -1392,6 +1405,7 @@ function StockItemRow({
         unit: unit.trim(),
         supplierId: supplierId || null,
         photoUrl,
+        packNote: packNote.trim() || null,
       },
       employeeId
     );
@@ -1441,6 +1455,12 @@ function StockItemRow({
             </option>
           ))}
         </select>
+        <input
+          value={packNote}
+          onChange={(e) => setPackNote(e.target.value)}
+          placeholder="หมายเหตุขนาดบรรจุ เช่น 1 แพ็ค = 24 ขวด (ไม่บังคับ)"
+          className="w-full rounded-lg border border-gray-200 px-2 py-1 text-xs outline-none focus:border-brand-400"
+        />
         <div className="flex gap-1.5 pt-0.5">
           <button onClick={handleSave} className="flex-1 rounded-lg bg-brand-600 py-1.5 text-[11px] font-bold text-white">
             บันทึก
@@ -1468,11 +1488,14 @@ function StockItemRow({
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-50 text-xs text-gray-300">📦</span>
         )}
         <div className="min-w-0 flex-1">
-          <span className="text-gray-700">{item.name}</span>
-          <span className="ml-1.5 text-gray-400">{item.unit}</span>
-          <span className={`ml-1.5 ${supplierName ? 'text-gray-400' : 'font-semibold text-status-warn'}`}>
-            {supplierName ? `· ${supplierName}` : '· ยังไม่ระบุผู้ขาย'}
-          </span>
+          <div>
+            <span className="text-gray-700">{item.name}</span>
+            <span className="ml-1.5 text-gray-400">{item.unit}</span>
+            <span className={`ml-1.5 ${supplierName ? 'text-gray-400' : 'font-semibold text-status-warn'}`}>
+              {supplierName ? `· ${supplierName}` : '· ยังไม่ระบุผู้ขาย'}
+            </span>
+          </div>
+          {item.packNote && <p className="truncate text-[10px] text-gray-400">📝 {item.packNote}</p>}
         </div>
       </div>
       <div className="flex shrink-0 gap-1">

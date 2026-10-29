@@ -735,8 +735,9 @@ export default function OrderPage() {
                                 )}
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-xs font-bold text-gray-800">{it.name}</p>
-                                  <p className="text-[11px] text-gray-400">
+                                  <p className="truncate text-[11px] text-gray-400">
                                     {priceOnly ? 'ยังไม่ระบุจำนวน — ใส่เป็นราคารวม' : it.unit}
+                                    {it.packNote ? ` · ${it.packNote}` : ''}
                                   </p>
                                 </div>
                                 <input

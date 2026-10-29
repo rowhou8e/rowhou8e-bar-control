@@ -209,6 +209,10 @@ alter table public.stock_items add column if not exists supplier_id uuid referen
 -- ช่วยแยกรายการชื่อคล้ายกัน (เช่น "01กระชาย" vs "กระชาย") ตั้งค่าได้ที่หน้า "ตั้งค่าระบบ" ไม่บังคับกรอก
 alter table public.stock_items add column if not exists photo_url text;
 
+-- หมายเหตุขนาดบรรจุ/หน่วย เช่น "1 แพ็ค = 24 ขวด" — กันลืมเวลากลับมาดูย้อนหลังว่าหน่วยที่ซื้อ (เช่น "แพ็ค", "ลัง")
+-- จริงๆ แล้วมีกี่ชิ้นข้างใน ตั้งค่าได้ที่หน้า "ตั้งค่าระบบ" ไม่บังคับกรอก แล้วโชว์ทุกที่ที่มีชื่อวัตถุดิบนี้ขึ้น (หน้าสั่งของ/ใบสั่งซื้อ/รายงาน)
+alter table public.stock_items add column if not exists pack_note text;
+
 -- ประวัติราคาต่อวัตถุดิบต่อผู้ขาย (append-only ห้ามแก้ไข/ลบ — เพิ่มแถวใหม่เสมอเมื่อราคาเปลี่ยน)
 -- รองรับวัตถุดิบชนิดเดียวกันซื้อได้จากหลายผู้ขาย และหน่วยที่ผู้ขายแต่ละรายขาย อาจต่างจาก unit หลักของวัตถุดิบ (เช่น ลัง/ขวด)
 create table if not exists public.supplier_item_prices (

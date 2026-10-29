@@ -39,6 +39,21 @@ function poTotal(po: PurchaseOrder) {
   return po.items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
 }
 
+/** จัดกลุ่มใบสั่งซื้อตามวันที่สั่ง — ใช้กับรายการที่เรียงวันที่ล่าสุดก่อนอยู่แล้ว (monthOrders) จึงแค่ไล่รวมแถวที่
+ *  วันที่เดียวกันติดกันเข้ากลุ่มเดียว ไม่ต้อง sort ซ้ำ */
+function groupByDate(orders: PurchaseOrder[]): { date: string; orders: PurchaseOrder[] }[] {
+  const groups: { date: string; orders: PurchaseOrder[] }[] = [];
+  for (const po of orders) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === po.orderDate) {
+      last.orders.push(po);
+    } else {
+      groups.push({ date: po.orderDate, orders: [po] });
+    }
+  }
+  return groups;
+}
+
 /** ย่อตัวเลขให้สั้นพอใส่บนแท่งกราฟแคบๆ ได้ (เช่น 35100 -> "35.1k") — ใช้เฉพาะ label บนกราฟ ที่อื่นยังโชว์เต็มเสมอ */
 function compactNumber(n: number): string {
   if (n >= 10000) return `${Math.round(n / 1000)}k`;
@@ -300,7 +315,7 @@ export default function PurchaseReportPage() {
                   className={view === 'item' ? '' : 'hidden print:block'}
                 />
 
-                <OrderDetailTable
+                <DailyOrderDetail
                   orders={monthOrders}
                   supplierName={supplierName}
                   supplierColorById={supplierColorById}
@@ -441,7 +456,10 @@ function BreakdownTable({
   );
 }
 
-function OrderDetailTable({
+/** รายละเอียดใบสั่งซื้อ จัดกลุ่มตามวันที่สั่ง — แต่ละใบแสดงรายการสินค้าแบบย่อ (ชื่อ จำนวน×ราคา) เรียงต่อกันเป็นข้อความบรรทัดเดียว
+ *  แทนที่จะตีเป็นตาราง 1 แถวต่อ 1 รายการ เพื่อให้เห็นรายละเอียดครบ (ไม่ต้องกดเข้าไปทีละใบ) แต่กินพื้นที่/หน้ากระดาษน้อย
+ *  เวลาปริ้น — สำคัญเพราะเดือนหนึ่งอาจมีหลายสิบใบ ถ้าตีตารางแยกรายการจะยาวเกินไป */
+function DailyOrderDetail({
   orders,
   supplierName,
   supplierColorById,
@@ -454,60 +472,56 @@ function OrderDetailTable({
   employees: Employee[];
   total: number;
 }) {
+  const groups = groupByDate(orders);
   return (
     <div className="print:break-inside-avoid-page rounded-2xl bg-white p-4 shadow-card print:rounded-none print:border print:border-gray-200 print:p-3 print:shadow-none">
-      <p className="mb-2 text-sm font-bold text-gray-800">รายละเอียดใบสั่งซื้อทั้งหมด ({orders.length} ใบ)</p>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left text-xs print:min-w-0">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-1.5 pr-2 font-semibold">วันที่สั่ง</th>
-              <th className="py-1.5 pr-2 font-semibold">ผู้ขาย</th>
-              <th className="py-1.5 pr-2 font-semibold">สถานะ</th>
-              <th className="py-1.5 pr-2 text-right font-semibold">จำนวนรายการ</th>
-              <th className="py-1.5 pr-2 text-right font-semibold">ยอดรวม (บาท)</th>
-              <th className="py-1.5 pr-2 font-semibold">วันที่รับของ</th>
-              <th className="py-1.5 font-semibold">ผู้สั่ง</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((po) => (
-              <tr key={po.id} className="border-b border-gray-50 last:border-0">
-                <td className="whitespace-nowrap py-1.5 pr-2 text-gray-700">{formatThaiDate(po.orderDate)}</td>
-                <td className="py-1.5 pr-2 text-gray-700">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full print:hidden"
-                      style={{ backgroundColor: supplierColorById(po.supplierId) }}
-                    />
-                    {supplierName(po.supplierId)}
-                  </span>
-                </td>
-                <td className="py-1.5 pr-2">
-                  <span className="print:hidden">
-                    <PurchaseOrderStatusBadge status={po.status} />
-                  </span>
-                  <span className="hidden text-gray-700 print:inline">{poStatusLabels[po.status]}</span>
-                </td>
-                <td className="py-1.5 pr-2 text-right text-gray-700">{po.items.length}</td>
-                <td className="py-1.5 pr-2 text-right font-semibold text-gray-800">{poTotal(po).toLocaleString()}</td>
-                <td className="whitespace-nowrap py-1.5 pr-2 text-gray-700">
-                  {po.receivedAt ? formatThaiDate(po.receivedAt) : '-'}
-                </td>
-                <td className="py-1.5 text-gray-700">{getEmployeeName(employees, po.createdBy)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={4} className="pt-2 text-right text-xs font-semibold text-gray-500">
-                รวมทั้งหมด
-              </td>
-              <td className="pt-2 text-right text-sm font-extrabold text-gray-900">{total.toLocaleString()}</td>
-              <td colSpan={2} className="pt-2" />
-            </tr>
-          </tfoot>
-        </table>
+      <p className="mb-2 text-sm font-bold text-gray-800">รายละเอียดใบสั่งซื้อรายวัน ({orders.length} ใบ)</p>
+      <div className="space-y-3">
+        {groups.map((g) => {
+          const dayTotal = g.orders.reduce((sum, po) => sum + poTotal(po), 0);
+          return (
+            <div key={g.date} className="print:break-inside-avoid">
+              <div className="mb-1 flex items-center justify-between border-b border-gray-100 pb-1">
+                <p className="text-xs font-bold text-gray-700">{formatThaiDate(g.date)}</p>
+                <p className="text-[11px] font-semibold text-gray-400">
+                  {g.orders.length} ใบ · {dayTotal.toLocaleString()} บาท
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {g.orders.map((po) => (
+                  <div key={po.id} className="text-[11px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full print:hidden"
+                          style={{ backgroundColor: supplierColorById(po.supplierId) }}
+                        />
+                        <span className="truncate font-semibold text-gray-800">{supplierName(po.supplierId)}</span>
+                        <span className="shrink-0 print:hidden">
+                          <PurchaseOrderStatusBadge status={po.status} />
+                        </span>
+                        <span className="hidden shrink-0 text-gray-400 print:inline">({poStatusLabels[po.status]})</span>
+                      </span>
+                      <span className="shrink-0 font-bold text-gray-700">{poTotal(po).toLocaleString()} บาท</span>
+                    </div>
+                    <p className="mt-0.5 text-gray-400">
+                      {po.items
+                        .map((it) => `${it.itemName} ${it.quantity}${it.unit}×${it.unitPrice.toLocaleString()}`)
+                        .join(' · ')}
+                      {' · '}
+                      {po.receivedAt ? `รับ ${formatThaiDate(po.receivedAt)}` : 'ยังไม่รับของ'} ·{' '}
+                      {getEmployeeName(employees, po.createdBy)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2">
+        <p className="text-xs font-semibold text-gray-500">รวมทั้งหมด</p>
+        <p className="text-sm font-extrabold text-gray-900">{total.toLocaleString()} บาท</p>
       </div>
     </div>
   );

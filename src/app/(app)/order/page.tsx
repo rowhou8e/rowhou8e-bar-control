@@ -28,9 +28,6 @@ export default function OrderPage() {
 
   const [qty, setQty] = useState<Record<string, string>>({});
   const [priceOverride, setPriceOverride] = useState<Record<string, string>>({});
-  // รายการที่ยังไม่รู้จำนวนแน่นอน ตอนสั่งขอใส่แค่ "ราคารวม" ที่จะจ่ายแทนไปก่อน (เลือกได้อย่างใดอย่างหนึ่งระหว่างจำนวน/ราคารวม
-  // ไม่ต้องรู้ทั้งคู่) — เก็บจำนวน=1 ไว้ก่อนตอนบันทึก แล้วไปกรอกจำนวนจริงทีหลังตอนแก้ใบสั่งซื้อฉบับร่าง (ใช้ตัว +/- ที่มีอยู่แล้ว)
-  const [priceOnlyMode, setPriceOnlyMode] = useState<Record<string, boolean>>({});
   const [orderDate, setOrderDate] = useState(toDateStr(now));
   const [activeSupplierId, setActiveSupplierId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -116,19 +113,18 @@ export default function OrderPage() {
     setQty((q) => ({ ...q, [id]: value }));
   }
 
-  // สลับโหมด "ไม่รู้จำนวน ใส่แค่ราคารวม" ของรายการนั้น — ล้างช่องราคาทุกครั้งที่สลับ เพื่อไม่ให้ราคาต่อหน่วยที่เติมอัตโนมัติ
-  // (จากประวัติการสั่งครั้งก่อน) ค้างมาปนกับราคารวมที่พนักงานจะพิมพ์เอง หรือย้อนกลับไปเป็นราคาต่อหน่วยที่ไม่ตรงบริบท
-  function togglePriceOnlyMode(id: string) {
-    setPriceOnlyMode((m) => ({ ...m, [id]: !m[id] }));
-    setPriceOverride((p) => {
-      const next = { ...p };
-      delete next[id];
-      return next;
-    });
+  // รายการนี้กำลังสั่งแบบ "รู้แค่ราคารวม ยังไม่รู้จำนวน" อยู่หรือไม่ — ตรวจจับอัตโนมัติจากสิ่งที่กรอกไว้ ไม่ต้องกดปุ่ม/ลิงก์ใดๆ
+  // ก่อน: เว้นช่องจำนวนว่างไว้ แล้วพิมพ์ราคาเอง (ต้องเป็นราคาที่พิมพ์เอง ไม่ใช่ราคาที่ระบบเติมให้อัตโนมัติจากประวัติ ถึงจะนับ)
+  // ก็ถือว่าราคานั้นคือยอดรวมทันที พอเริ่มพิมพ์จำนวน ระบบจะตีความราคากลับเป็น "ราคาต่อหน่วย" ตามปกติเองทันที — จึงไม่กระทบ
+  // การสั่งแบบปกติที่กรอกทั้งจำนวนและราคาต่อหน่วยคู่กัน (เคสส่วนใหญ่) เลย
+  function isPriceOnly(it: StockItem): boolean {
+    if (Number(qty[it.id]) > 0) return false;
+    const typed = priceOverride[it.id];
+    return typed !== undefined && typed !== '' && Number(typed) > 0;
   }
 
   function isItemSelected(it: StockItem): boolean {
-    return priceOnlyMode[it.id] ? Number(priceOverride[it.id]) > 0 : Number(qty[it.id]) > 0;
+    return Number(qty[it.id]) > 0 || isPriceOnly(it);
   }
 
   function selectAllFiltered() {
@@ -144,11 +140,6 @@ export default function OrderPage() {
   function clearAllSelected() {
     setQty((q) => {
       const next = { ...q };
-      for (const it of filteredItems) delete next[it.id];
-      return next;
-    });
-    setPriceOnlyMode((m) => {
-      const next = { ...m };
       for (const it of filteredItems) delete next[it.id];
       return next;
     });
@@ -176,7 +167,7 @@ export default function OrderPage() {
   const groupList = Array.from(groups.entries());
 
   function itemTotal(it: StockItem) {
-    if (priceOnlyMode[it.id]) return Number(priceOverride[it.id]) || 0;
+    if (isPriceOnly(it)) return Number(priceOverride[it.id]) || 0;
     return (Number(qty[it.id]) || 0) * (Number(effectivePrice(it)) || 0);
   }
 
@@ -217,7 +208,7 @@ export default function OrderPage() {
         // รายการที่สั่งแบบ "ยังไม่รู้จำนวน ใส่แค่ราคารวม" — บันทึกจำนวน = 1 ไปก่อน (หน่วยเดิมของวัตถุดิบ) แล้วเอาราคารวม
         // ที่พนักงานพิมพ์มาใส่เป็น unitPrice ตรงๆ (1 × ยอดรวม = ยอดรวม พอดี) ไปกรอกจำนวนจริงทีหลังตอนแก้ใบสั่งซื้อฉบับร่าง
         const orderItems = stockGroup.map((it) =>
-          priceOnlyMode[it.id]
+          isPriceOnly(it)
             ? {
                 stockItemId: it.id,
                 itemName: it.name,
@@ -711,7 +702,7 @@ export default function OrderPage() {
                         <div className="space-y-1.5">
                           {items.map((it) => {
                             const isSelected = isItemSelected(it);
-                            const priceOnly = !!priceOnlyMode[it.id];
+                            const priceOnly = isPriceOnly(it);
                             return (
                               <div
                                 key={it.id}
@@ -725,7 +716,6 @@ export default function OrderPage() {
                                   onChange={() => {
                                     if (isSelected) {
                                       setItemQty(it.id, '');
-                                      setPriceOnlyMode((m) => ({ ...m, [it.id]: false }));
                                       setPriceOverride((p) => {
                                         const next = { ...p };
                                         delete next[it.id];
@@ -745,42 +735,28 @@ export default function OrderPage() {
                                 )}
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-xs font-bold text-gray-800">{it.name}</p>
-                                  <p className="text-[11px] text-gray-400">{it.unit}</p>
+                                  <p className="text-[11px] text-gray-400">
+                                    {priceOnly ? 'ยังไม่ระบุจำนวน — ใส่เป็นราคารวม' : it.unit}
+                                  </p>
                                 </div>
-                                <div className="flex shrink-0 flex-col items-end gap-0.5">
-                                  <div className="flex gap-2">
-                                    {priceOnly ? (
-                                      <span className="flex h-[30px] w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-200 text-[10px] text-gray-400">
-                                        ยังไม่ระบุ
-                                      </span>
-                                    ) : (
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        value={qty[it.id] ?? ''}
-                                        onChange={(e) => setItemQty(it.id, e.target.value)}
-                                        placeholder="จำนวน"
-                                        className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
-                                      />
-                                    )}
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      value={priceOnly ? (priceOverride[it.id] ?? '') : effectivePrice(it)}
-                                      onChange={(e) => setPriceOverride((p) => ({ ...p, [it.id]: e.target.value }))}
-                                      placeholder={priceOnly ? 'ราคารวม' : 'ราคา'}
-                                      title={priceOnly ? 'ราคารวมที่จะจ่าย (ยังไม่ระบุจำนวน)' : 'ราคาต่อหน่วย (บาท)'}
-                                      className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
-                                    />
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => togglePriceOnlyMode(it.id)}
-                                    className="text-[10px] font-semibold text-brand-500"
-                                  >
-                                    {priceOnly ? 'ระบุจำนวนแทน' : 'ไม่รู้จำนวน? ใส่ราคารวมแทน'}
-                                  </button>
-                                </div>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={qty[it.id] ?? ''}
+                                  onChange={(e) => setItemQty(it.id, e.target.value)}
+                                  placeholder="จำนวน"
+                                  title="ไม่รู้จำนวน? เว้นว่างไว้แล้วใส่ราคารวมในช่องถัดไปแทนได้"
+                                  className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
+                                />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={priceOnly ? (priceOverride[it.id] ?? '') : effectivePrice(it)}
+                                  onChange={(e) => setPriceOverride((p) => ({ ...p, [it.id]: e.target.value }))}
+                                  placeholder={priceOnly ? 'ราคารวม' : 'ราคา'}
+                                  title={priceOnly ? 'ราคารวมที่จะจ่าย (ยังไม่ระบุจำนวน)' : 'ราคาต่อหน่วย (บาท)'}
+                                  className="w-16 shrink-0 rounded-lg border border-gray-200 px-2 py-1.5 text-center text-xs outline-none focus:border-brand-400"
+                                />
                               </div>
                             );
                           })}
@@ -883,7 +859,7 @@ export default function OrderPage() {
                     <p className="mt-0.5 text-[11px] text-gray-400">
                       {items.length} รายการ —{' '}
                       {items
-                        .map((it) => (priceOnlyMode[it.id] ? `${it.name} (ยังไม่ระบุจำนวน)` : `${it.name} ${qty[it.id] || 0} ${it.unit}`))
+                        .map((it) => (isPriceOnly(it) ? `${it.name} (ยังไม่ระบุจำนวน)` : `${it.name} ${qty[it.id] || 0} ${it.unit}`))
                         .join(', ')}
                     </p>
                   )}

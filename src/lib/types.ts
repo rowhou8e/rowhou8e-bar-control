@@ -36,6 +36,10 @@ export interface Employee {
   /** อุปกรณ์/เวลาล็อกอินล่าสุด — เก็บแค่ครั้งล่าสุดครั้งเดียวต่อพนักงาน (ไม่ใช่ประวัติ) — เฟส 4 */
   lastLoginAt: string | null;
   lastLoginDevice: string | null;
+  /** สิทธิ์พาร์ทไทม์ — เจ้าของ/ผู้จัดการเปิดให้เฉพาะพนักงานที่มาช่วยงานเป็นครั้งคราว
+   *  มีผลแค่กับการไฮไลต์สีเขียว "มาช่วยพิเศษ" ในปฏิทิน: พนักงานประจำที่ถูกสลับให้มาทำงานในวันที่ปกติหยุด
+   *  จะไม่ขึ้นสีเขียว ต้องเป็นคนที่ได้รับสิทธิ์นี้เท่านั้น (ไม่กระทบสิทธิ์การใช้งานอื่นใดของระบบ) */
+  isPartTime: boolean;
 }
 
 export type ItemStatus =
@@ -561,7 +565,17 @@ export interface AppStore {
     id: string,
     /** pinCode ใช้ได้เฉพาะโหมด mock เท่านั้น (โหมด Supabase ใช้อีเมล/รหัสผ่านผ่าน Supabase Auth แทน — ค่านี้จะถูกละเว้น)
      *  name/nickname เปลี่ยนได้เฉพาะเจ้าของร้านเท่านั้น (จำกัดสิทธิ์ที่หน้าจอ + RLS ฝั่ง employees_update_owner_only) */
-    patch: { role?: Role; active?: boolean; stationId?: string | null; stationIds?: string[]; pinCode?: string; name?: string; nickname?: string; avatarUrl?: string | null },
+    patch: {
+      role?: Role;
+      active?: boolean;
+      stationId?: string | null;
+      stationIds?: string[];
+      pinCode?: string;
+      name?: string;
+      nickname?: string;
+      avatarUrl?: string | null;
+      isPartTime?: boolean;
+    },
     actorId: string
   ): void | Promise<void>;
   /**

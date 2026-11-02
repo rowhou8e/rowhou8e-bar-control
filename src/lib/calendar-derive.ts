@@ -48,7 +48,9 @@ export function employeesOffOnDate(
 }
 
 /** รายชื่อพนักงานที่ถูกเรียกมาทำงานพิเศษในวันที่กำหนด — ปกติหยุดตามวันหยุดประจำ แต่มีข้อยกเว้นระบุว่า "ทำงาน" วันนี้
- *  (ตั้งผ่านปุ่มแก้ไขวันหยุด สลับสถานะจาก "หยุด" เป็น "ทำงาน") ใช้โชว์เป็นสีเขียวในปฏิทิน ให้ทุกคนเห็นว่ามีคนมาช่วยเสริมวันนี้ */
+ *  (ตั้งผ่านปุ่มแก้ไขวันหยุด สลับสถานะจาก "หยุด" เป็น "ทำงาน") ใช้โชว์เป็นสีเขียวในปฏิทิน ให้ทุกคนเห็นว่ามีคนมาช่วยเสริมวันนี้
+ *  จำกัดเฉพาะพนักงานที่ได้รับ "สิทธิ์พาร์ทไทม์" (employee.isPartTime) เท่านั้น — พนักงานประจำที่ถูกสลับสถานะ
+ *  ในลักษณะเดียวกันจะไม่ถูกนับว่าเป็น "มาช่วยพิเศษ" และจะไม่ขึ้นสีเขียว */
 export function employeesExtraWorkingOnDate(
   dateStr: string,
   employees: Employee[],
@@ -58,7 +60,7 @@ export function employeesExtraWorkingOnDate(
     .filter((entry) => entry.date === dateStr && entry.status === 'work')
     .map((entry) => {
       const employee = employees.find((e) => e.id === entry.employeeId);
-      if (!employee) return null;
+      if (!employee || !employee.isPartTime) return null;
       return { employee, effective: { status: entry.status, source: 'exception', entry } as EffectiveDayStatus };
     })
     .filter((x): x is DayOffInfo => x !== null);

@@ -148,6 +148,7 @@ export async function fetchEmployees(): Promise<Employee[]> {
     createdAt: r.created_at,
     lastLoginAt: r.last_login_at ?? null,
     lastLoginDevice: r.last_login_device ?? null,
+    isPartTime: r.is_part_time ?? false,
   }));
 }
 
@@ -173,6 +174,7 @@ export async function fetchEmployeeByAuthUserId(authUserId: string): Promise<Emp
     createdAt: data.created_at,
     lastLoginAt: data.last_login_at ?? null,
     lastLoginDevice: data.last_login_device ?? null,
+    isPartTime: data.is_part_time ?? false,
   };
 }
 
@@ -1744,7 +1746,16 @@ export async function fetchEmployeeEmails(): Promise<Record<string, string>> {
 // ================= EMPLOYEES (แก้ไข) =================
 export async function updateEmployee(
   id: string,
-  patch: { role?: string; active?: boolean; stationId?: string | null; stationIds?: string[]; name?: string; nickname?: string; avatarUrl?: string | null },
+  patch: {
+    role?: string;
+    active?: boolean;
+    stationId?: string | null;
+    stationIds?: string[];
+    name?: string;
+    nickname?: string;
+    avatarUrl?: string | null;
+    isPartTime?: boolean;
+  },
   actorId: string
 ) {
   const sb = getSupabaseClient();
@@ -1757,6 +1768,7 @@ export async function updateEmployee(
   if (patch.name !== undefined) dbPatch.name = patch.name;
   if (patch.nickname !== undefined) dbPatch.nickname = patch.nickname;
   if (patch.avatarUrl !== undefined) dbPatch.avatar_url = patch.avatarUrl;
+  if (patch.isPartTime !== undefined) dbPatch.is_part_time = patch.isPartTime;
 
   const { error } = await sb.from('employees').update(dbPatch).eq('id', id);
   if (error) throw error;
@@ -1781,6 +1793,8 @@ export async function updateEmployee(
     detail = `เปลี่ยนแผนกที่ประจำเป็น ${station?.name ?? 'ไม่ระบุ'}`;
   } else if (patch.name !== undefined || patch.nickname !== undefined) {
     detail = `เปลี่ยนชื่อจาก "${before?.name ?? id}" เป็น "${patch.name ?? before?.name ?? id}"${patch.nickname !== undefined ? ` (ชื่อเล่น: ${patch.nickname})` : ''}`;
+  } else if (patch.isPartTime !== undefined) {
+    detail = patch.isPartTime ? 'เปิดสิทธิ์พาร์ทไทม์' : 'ปิดสิทธิ์พาร์ทไทม์';
   }
   await sb.from('history_logs').insert({
     action_type: 'settings_change',

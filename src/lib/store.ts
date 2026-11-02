@@ -524,6 +524,7 @@ class Store {
         createdAt: new Date().toISOString(),
         lastLoginAt: null,
         lastLoginDevice: null,
+        isPartTime: false,
       };
       this.log('settings_change', input.actorId, `พนักงาน: ${input.name}`, `เพิ่มพนักงานใหม่: ${input.name} (${input.nickname}) — สิทธิ์ ${input.role}`);
       return { ...s, employees: [...s.employees, emp] };
@@ -532,7 +533,11 @@ class Store {
 
   /** pinCode ใช้ได้เฉพาะโหมด mock — เปลี่ยน PIN ของตัวเอง หรือ owner รีเซ็ต PIN ให้พนักงานคนอื่น
    *  name/nickname เปลี่ยนได้เฉพาะเจ้าของร้านเท่านั้น (จำกัดสิทธิ์ที่หน้าจอ) */
-  updateEmployee(id: string, patch: Partial<Pick<Employee, 'role' | 'active' | 'stationId' | 'stationIds' | 'pinCode' | 'name' | 'nickname' | 'avatarUrl'>>, actorId: string) {
+  updateEmployee(
+    id: string,
+    patch: Partial<Pick<Employee, 'role' | 'active' | 'stationId' | 'stationIds' | 'pinCode' | 'name' | 'nickname' | 'avatarUrl' | 'isPartTime'>>,
+    actorId: string
+  ) {
     this.update((s) => {
       const emp = s.employees.find((e) => e.id === id);
       const employees = s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e));
@@ -547,6 +552,8 @@ class Store {
           detail = actorId === id ? 'เปลี่ยนรหัส PIN ของตัวเอง' : `รีเซ็ตรหัส PIN ให้ ${emp.name}`;
         } else if (patch.name !== undefined || patch.nickname !== undefined) {
           detail = `เปลี่ยนชื่อจาก "${emp.name}" เป็น "${patch.name ?? emp.name}"${patch.nickname !== undefined ? ` (ชื่อเล่น: ${patch.nickname})` : ''}`;
+        } else if (patch.isPartTime !== undefined) {
+          detail = patch.isPartTime ? 'เปิดสิทธิ์พาร์ทไทม์' : 'ปิดสิทธิ์พาร์ทไทม์';
         }
         this.log('settings_change', actorId, `พนักงาน: ${emp.name}`, detail);
       }

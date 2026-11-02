@@ -74,6 +74,7 @@ export const employees: Employee[] = [
     createdAt: '2025-01-05T08:00:00+07:00',
     lastLoginAt: addHours(NOW, -2).toISOString(),
     lastLoginDevice: 'iPhone · Safari',
+    isPartTime: false,
   },
   {
     id: 'emp-manager-1',
@@ -89,6 +90,7 @@ export const employees: Employee[] = [
     createdAt: '2025-01-10T08:00:00+07:00',
     lastLoginAt: addHours(NOW, -5).toISOString(),
     lastLoginDevice: 'Android · Chrome',
+    isPartTime: false,
   },
   {
     id: 'emp-staff-1',
@@ -104,6 +106,7 @@ export const employees: Employee[] = [
     createdAt: '2025-02-01T08:00:00+07:00',
     lastLoginAt: addHours(NOW, -20).toISOString(),
     lastLoginDevice: 'Android · Chrome',
+    isPartTime: false,
   },
   {
     id: 'emp-staff-2',
@@ -119,6 +122,7 @@ export const employees: Employee[] = [
     createdAt: '2025-02-15T08:00:00+07:00',
     lastLoginAt: null,
     lastLoginDevice: null,
+    isPartTime: false,
   },
   {
     id: 'emp-staff-3',
@@ -134,6 +138,7 @@ export const employees: Employee[] = [
     createdAt: '2025-03-01T08:00:00+07:00',
     lastLoginAt: addHours(NOW, -30).toISOString(),
     lastLoginDevice: 'iPad · Safari',
+    isPartTime: true, // ตัวอย่าง: พนักงานที่ได้รับสิทธิ์พาร์ทไทม์ — มาช่วยงานพิเศษจะขึ้นสีเขียวในปฏิทิน
   },
 ];
 

@@ -685,7 +685,16 @@ export class LiveStore {
 
   async updateEmployee(
     id: string,
-    patch: { role?: Role; active?: boolean; stationId?: string | null; stationIds?: string[]; name?: string; nickname?: string },
+    patch: {
+      role?: Role;
+      active?: boolean;
+      stationId?: string | null;
+      stationIds?: string[];
+      name?: string;
+      nickname?: string;
+      avatarUrl?: string | null;
+      isPartTime?: boolean;
+    },
     actorId: string
   ) {
     await q.updateEmployee(id, patch, actorId);

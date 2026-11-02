@@ -391,6 +391,23 @@ export default function SettingsPage() {
                       </div>
                     )}
 
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-gray-700">สิทธิ์พาร์ทไทม์</p>
+                        <p className="text-[10px] leading-tight text-gray-400">
+                          เปิดไว้ถ้ามาช่วยงานเป็นครั้งคราว — ชื่อจะขึ้นสีเขียวในปฏิทินเมื่อมาทำงานวันที่ปกติหยุด
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => employee && store.updateEmployee(emp.id, { isPartTime: !emp.isPartTime }, employee.id)}
+                        className={`shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold ${
+                          emp.isPartTime ? 'bg-status-okBg text-status-ok' : 'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        {emp.isPartTime ? 'เปิดอยู่' : 'ปิดอยู่'}
+                      </button>
+                    </div>
+
                     <p className="mt-2 text-[11px] text-gray-400">
                       ล็อกอินล่าสุด:{' '}
                       {emp.lastLoginAt

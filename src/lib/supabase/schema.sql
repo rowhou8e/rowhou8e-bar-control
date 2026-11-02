@@ -36,6 +36,8 @@ create table if not exists public.employees (
   avatar_color text not null default '#EA580C',
   station_id uuid references public.stations (id) on delete set null, -- บาร์ที่ประจำ — null สำหรับ owner/manager หรือพนักงานที่ทำได้ทุกบาร์
   active boolean not null default true,
+  -- สิทธิ์พาร์ทไทม์ — เปิดเฉพาะพนักงานที่มาช่วยงานเป็นครั้งคราว มีผลแค่กับการไฮไลต์สีเขียว "มาช่วยพิเศษ" ในปฏิทิน
+  is_part_time boolean not null default false,
   created_at timestamptz not null default now(),
   -- อุปกรณ์/เวลาล็อกอินล่าสุด — เก็บแค่ครั้งล่าสุดครั้งเดียว (ไม่ใช่ประวัติ) — เฟส 4, อัปเดตผ่าน record_login() เท่านั้น
   last_login_at timestamptz,

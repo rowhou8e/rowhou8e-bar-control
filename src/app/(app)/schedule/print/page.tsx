@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppState, useCurrentEmployee } from '@/lib/use-store';
 import { formatThaiDateTime, toDateStr } from '@/lib/derive';
-import { WEEKDAY_FULL, buildMonthGrid, employeesOffOnDate, monthLabel, specialDaysForDate } from '@/lib/calendar-derive';
+import { WEEKDAY_FULL, buildMonthGrid, employeesExtraWorkingOnDate, employeesOffOnDate, monthLabel, specialDaysForDate } from '@/lib/calendar-derive';
 
 /** ความกว้างชีทตาราง — ตรงกับขนาดกระดาษ A4 แนวนอนที่ตั้งไว้ใน @page ด้านล่าง (~96dpi) */
 const SHEET_WIDTH_PX = 1123;
@@ -128,6 +128,10 @@ export default function SchedulePrintPage() {
                 ? employeesOffOnDate(cell.dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries)
                 : [];
               const overflowNames = overflowOffList.map(({ employee: e }) => e.nickname).join(', ');
+              const overflowExtraList = cell.dateStr
+                ? employeesExtraWorkingOnDate(cell.dateStr, activeEmployees, workCalendarEntries)
+                : [];
+              const overflowExtraNames = overflowExtraList.map(({ employee: e }) => e.nickname).join(', ');
               return (
                 <div
                   key={idx}
@@ -146,6 +150,11 @@ export default function SchedulePrintPage() {
                       หยุด: {overflowNames}
                     </p>
                   )}
+                  {overflowExtraNames && (
+                    <p style={{ margin: '4px 0 0', fontSize: '12px', fontWeight: 600, color: '#BBF7D0', lineHeight: 1.4 }}>
+                      มาช่วย: {overflowExtraNames}
+                    </p>
+                  )}
                 </div>
               );
             }
@@ -154,6 +163,8 @@ export default function SchedulePrintPage() {
             const badges = specialDaysForDate(dateStr, specialDays);
             const offList = employeesOffOnDate(dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries);
             const names = offList.map(({ employee: e }) => e.nickname).join(', ');
+            const extraList = employeesExtraWorkingOnDate(dateStr, activeEmployees, workCalendarEntries);
+            const extraNames = extraList.map(({ employee: e }) => e.nickname).join(', ');
 
             return (
               <div
@@ -210,6 +221,11 @@ export default function SchedulePrintPage() {
                     หยุด: {names}
                   </p>
                 )}
+                {extraNames && (
+                  <p style={{ margin: '4px 0 0', fontSize: '18px', fontWeight: 800, color: '#16A34A', lineHeight: 1.3 }}>
+                    มาช่วย: {extraNames}
+                  </p>
+                )}
               </div>
             );
           })}
@@ -229,6 +245,7 @@ export default function SchedulePrintPage() {
           <LegendDot color="#DC2626" label="วันหยุดราชการ" />
           <LegendDot color="#EA580C" label="วันพระ" />
           <LegendDot color="#D97706" label="วันสำคัญ" />
+          <LegendDot color="#16A34A" label="มาช่วยพิเศษ" />
         </div>
       </>
     );

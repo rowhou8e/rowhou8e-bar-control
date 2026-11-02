@@ -13,6 +13,7 @@ import {
   isVerifiedHolyDayYear,
   buildMonthGrid,
   effectiveStatus,
+  employeesExtraWorkingOnDate,
   employeesOffOnDate,
   fixedThaiPublicHolidays,
   monthLabel,
@@ -133,6 +134,7 @@ export default function SchedulePage() {
           <LegendDot color="#DC2626" label="วันหยุดราชการ" />
           <LegendDot color="#EA580C" label="วันพระ" />
           <LegendDot color="#D97706" label="วันสำคัญ" />
+          <LegendDot color="#16A34A" label="มาช่วยพิเศษ" />
         </div>
         {!canManage && (
           <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
@@ -159,12 +161,20 @@ export default function SchedulePage() {
                   canManage && cell.dateStr
                     ? employeesOffOnDate(cell.dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries)
                     : [];
+                const overflowExtraList = cell.dateStr
+                  ? employeesExtraWorkingOnDate(cell.dateStr, activeEmployees, workCalendarEntries)
+                  : [];
                 return (
                   <div key={idx} className="min-h-[58px] overflow-hidden rounded-[10px] p-1 opacity-40">
                     <span className="text-[11px] font-semibold text-gray-400">{cell.date?.getDate()}</span>
                     {overflowOffList.length > 0 && (
                       <p className="mt-0.5 line-clamp-2 text-[7px] font-medium leading-tight text-gray-400">
                         {overflowOffList.map((o) => o.employee.nickname).join(', ')}
+                      </p>
+                    )}
+                    {overflowExtraList.length > 0 && (
+                      <p className="mt-0.5 line-clamp-2 text-[7px] font-semibold leading-tight text-green-500">
+                        {overflowExtraList.map((o) => o.employee.nickname).join(', ')}
                       </p>
                     )}
                   </div>
@@ -176,6 +186,7 @@ export default function SchedulePage() {
               const badges = specialDaysForDate(dateStr, specialDays);
               const badge = badges[0];
               const offList = employeesOffOnDate(dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries);
+              const extraList = employeesExtraWorkingOnDate(dateStr, activeEmployees, workCalendarEntries);
 
               return (
                 <button
@@ -211,6 +222,12 @@ export default function SchedulePage() {
                   {canManage && offList.length > 0 && (
                     <p className="mt-0.5 line-clamp-2 text-[7.5px] font-semibold leading-tight text-gray-600">
                       {offList.map(({ employee: e }) => e.nickname).join(', ')}
+                    </p>
+                  )}
+
+                  {extraList.length > 0 && (
+                    <p className="mt-0.5 line-clamp-2 text-[7.5px] font-bold leading-tight text-status-ok">
+                      {extraList.map(({ employee: e }) => e.nickname).join(', ')}
                     </p>
                   )}
                 </button>

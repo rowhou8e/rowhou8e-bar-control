@@ -15,7 +15,6 @@ import {
   effectiveStatus,
   employeesOffOnDate,
   fixedThaiPublicHolidays,
-  initials,
   monthLabel,
   specialDayColor,
   specialDaysForDate,
@@ -135,16 +134,7 @@ export default function SchedulePage() {
           <LegendDot color="#EA580C" label="วันพระ" />
           <LegendDot color="#D97706" label="วันสำคัญ" />
         </div>
-        {canManage ? (
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full border-[1.3px] border-dashed border-gray-400" /> เส้นประ = วันหยุดประจำ
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full bg-gray-400" /> ทึบ = ลา/สลับกะ (ข้อยกเว้น)
-            </span>
-          </div>
-        ) : (
+        {!canManage && (
           <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
             <span className="inline-block h-3 w-3 rounded-[3px] bg-gray-300" /> วันหยุดของฉัน
           </div>
@@ -219,22 +209,9 @@ export default function SchedulePage() {
                   {isToday && <span className="absolute right-1 top-0.5 text-[7px] font-bold text-brand-600">วันนี้</span>}
 
                   {canManage && offList.length > 0 && (
-                    <div className="absolute bottom-1 left-1 right-1 flex flex-wrap gap-0.5">
-                      {offList.slice(0, 4).map(({ employee: e, effective }) => (
-                        <span
-                          key={e.id}
-                          className="flex h-[15px] w-[15px] items-center justify-center rounded-full text-[6.5px] font-bold"
-                          style={
-                            effective.source === 'pattern'
-                              ? { border: `1.3px dashed ${e.avatarColor}`, color: e.avatarColor, backgroundColor: 'transparent' }
-                              : { backgroundColor: e.avatarColor, color: '#fff' }
-                          }
-                          title={e.nickname}
-                        >
-                          {initials(e)}
-                        </span>
-                      ))}
-                    </div>
+                    <p className="mt-0.5 line-clamp-2 text-[7.5px] font-semibold leading-tight text-gray-600">
+                      {offList.map(({ employee: e }) => e.nickname).join(', ')}
+                    </p>
                   )}
                 </button>
               );
@@ -244,7 +221,7 @@ export default function SchedulePage() {
 
         {canManage ? (
           <p className="text-center text-[11.5px] text-gray-400">
-            แตะวันที่เพื่อแก้ไขว่าใครหยุด — วันที่หยุดประจำ (เส้นประ) ไม่ต้องกดซ้ำทุกเดือน
+            แตะวันที่เพื่อแก้ไขว่าใครหยุด — วันหยุดประจำไม่ต้องกดซ้ำทุกเดือน
           </p>
         ) : (
           <p className="text-center text-[11.5px] text-gray-400">ช่องสีเทา = วันที่ฉันหยุด • ดูได้อย่างเดียว แก้ไขไม่ได้</p>

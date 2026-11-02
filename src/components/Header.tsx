@@ -52,17 +52,19 @@ export function Header({
       </div>
       {currentEmployee && (
         <div className="relative">
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
-            style={currentEmployee.avatarUrl ? undefined : { backgroundColor: currentEmployee.avatarColor }}
-          >
-            {currentEmployee.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={currentEmployee.avatarUrl} alt={currentEmployee.nickname} className="h-full w-full object-cover" />
-            ) : (
-              currentEmployee.nickname.slice(0, 2)
-            )}
+          <button onClick={() => setMenuOpen((v) => !v)} className="flex max-w-[140px] items-center gap-1.5">
+            <span className="truncate text-sm font-semibold text-gray-700">{currentEmployee.nickname}</span>
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white"
+              style={currentEmployee.avatarUrl ? undefined : { backgroundColor: currentEmployee.avatarColor }}
+            >
+              {currentEmployee.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={currentEmployee.avatarUrl} alt={currentEmployee.nickname} className="h-full w-full object-cover" />
+              ) : (
+                currentEmployee.nickname.slice(0, 2)
+              )}
+            </span>
           </button>
           {menuOpen && (
             <>

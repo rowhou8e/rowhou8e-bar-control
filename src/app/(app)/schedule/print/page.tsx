@@ -161,7 +161,7 @@ export default function SchedulePrintPage() {
                 style={{
                   border: isToday ? '2px solid #424242' : '1px solid #E5E7EB',
                   borderRadius: '6px',
-                  minHeight: '92px',
+                  minHeight: '112px',
                   padding: '5px 7px',
                   background: isToday || badges.length > 0 ? '#F5F5F5' : '#fff',
                   display: 'flex',
@@ -206,7 +206,7 @@ export default function SchedulePrintPage() {
                     })()}
                 </div>
                 {names && (
-                  <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: 700, color: '#374151', lineHeight: 1.4 }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '18px', fontWeight: 800, color: '#374151', lineHeight: 1.3 }}>
                     หยุด: {names}
                   </p>
                 )}

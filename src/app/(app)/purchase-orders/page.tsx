@@ -56,6 +56,8 @@ export default function PurchaseOrdersPage() {
             </SecondaryButton>
           </div>
 
+          <SecondaryButton onClick={() => router.push('/purchase-orders/price-list')}>💰 รายการราคา</SecondaryButton>
+
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
           {TABS.map((t) => (
             <button

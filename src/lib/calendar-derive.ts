@@ -34,7 +34,10 @@ export interface DayOffInfo {
   effective: EffectiveDayStatus;
 }
 
-/** รายชื่อพนักงานทุกคนที่หยุดในวันที่กำหนด (ทั้งจาก pattern และข้อยกเว้น) */
+/** รายชื่อพนักงานทุกคนที่หยุดในวันที่กำหนด (ทั้งจาก pattern และข้อยกเว้น)
+ *  ไม่รวมพนักงานที่มี "สิทธิ์พาร์ทไทม์" (employee.isPartTime) — พนักงานกลุ่มนี้ทำงานเป็นรายวัน
+ *  ไม่มีวันหยุดประจำแบบพนักงานทั่วไป จึงไม่จำเป็นต้องขึ้นชื่อในรายชื่อ "วันหยุด" ของปฏิทิน
+ *  (จะขึ้นชื่อก็ต่อเมื่อถูกเรียกมาทำงานพิเศษ ผ่าน employeesExtraWorkingOnDate ด้านล่างแทน) */
 export function employeesOffOnDate(
   dateStr: string,
   weekday: Weekday,
@@ -43,6 +46,7 @@ export function employeesOffOnDate(
   workCalendarEntries: WorkCalendarEntry[]
 ): DayOffInfo[] {
   return employees
+    .filter((employee) => !employee.isPartTime)
     .map((employee) => ({ employee, effective: effectiveStatus(employee.id, dateStr, weekday, weeklyPatterns, workCalendarEntries) }))
     .filter((x) => x.effective.status === 'off');
 }

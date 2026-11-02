@@ -14,7 +14,8 @@ export default function WeeklyPatternSettingsPage() {
   const employee = useCurrentEmployee();
   const { employees, weeklyPatterns } = useAppState();
 
-  const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
+  // พนักงานพาร์ทไทม์ทำงานเป็นรายวัน ไม่มีวันหยุดประจำแบบพนักงานทั่วไป จึงไม่ต้องตั้งค่าในหน้านี้
+  const activeEmployees = useMemo(() => employees.filter((e) => e.active && !e.isPartTime), [employees]);
   const canManage = employee?.role === 'owner' || employee?.role === 'manager';
 
   // ผู้จัดการแก้ไขวันหยุดประจำของทุกคนได้ ยกเว้นของเจ้าของร้าน (ต้องให้เจ้าของแก้เอง) — ตรงกับสิทธิ์ฝั่งฐานข้อมูล

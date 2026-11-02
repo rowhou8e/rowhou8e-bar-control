@@ -18,7 +18,8 @@ export default function SchedulePrintPage() {
   const [exporting, setExporting] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
-  const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees]);
+  // ไม่โชว์วันหยุดของเจ้าของร้านในรายงานที่พิมพ์ออกมา (ยังนับวันหยุดคนอื่นตามปกติ)
+  const activeEmployees = useMemo(() => employees.filter((e) => e.active && e.role !== 'owner'), [employees]);
   const weeks = useMemo(() => buildMonthGrid(year, month0), [year, month0]);
   const todayStr = toDateStr(now);
 

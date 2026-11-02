@@ -204,17 +204,28 @@ export default function PurchaseOrderDetailPage() {
     }
   }
 
+  function handlePrint() {
+    if (typeof window !== 'undefined') window.print();
+  }
+
   return (
     <div>
       <Header title={supplier?.name ?? 'ใบสั่งซื้อ'} subtitle={formatThaiDate(po.orderDate)} currentEmployee={employee} onBack={() => router.back()} />
-      <main className="space-y-4 px-4 py-4">
+      <main className="space-y-4 px-4 py-4 print:space-y-3 print:px-0 print:py-0">
+        {/* หัวกระดาษเฉพาะตอนปริ้น — Header component (โลโก้/เมนู) ถูกซ่อนอัตโนมัติทั้งไซต์ตอนปริ้น (ดู globals.css)
+            จึงต้องมีบรรทัดชื่อเอกสารของตัวเองให้รู้ว่านี่คือใบสั่งซื้อของใคร/วันไหน */}
+        <div className="hidden print:block print:mb-1">
+          <p className="text-base font-bold text-gray-900">ใบสั่งซื้อ (Purchase Order)</p>
+          <p className="text-xs text-gray-500">{supplier?.name ?? 'ไม่ระบุผู้ขาย'} · วันที่สั่ง {formatThaiDate(po.orderDate)}</p>
+        </div>
+
         <div
-          className="rounded-2xl border-l-4 bg-white p-4 shadow-card"
+          className="rounded-2xl border-l-4 bg-white p-4 shadow-card print:rounded-none print:border print:border-l-4 print:p-3 print:shadow-none"
           style={{ borderLeftColor: supplierColor(supplier), backgroundColor: hexToRgba(supplierColor(supplier), 0.05) }}
         >
           <div className="flex items-center justify-between">
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: supplierColor(supplier) }} />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full print:hidden" style={{ backgroundColor: supplierColor(supplier) }} />
               <p className="truncate text-sm font-bold text-gray-900">{supplier?.name ?? 'ไม่ระบุผู้ขาย'}</p>
             </div>
             <PurchaseOrderStatusBadge status={po.status} />
@@ -253,7 +264,8 @@ export default function PurchaseOrderDetailPage() {
           {po.note && <p className="mt-3 rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs text-gray-500">หมายเหตุ: {po.note}</p>}
         </div>
 
-        <div className="rounded-2xl bg-white p-4 shadow-card">
+        {/* รายการสินค้าแบบโต้ตอบได้ (ปรับจำนวน/ราคา/ลบ) — โชว์แค่บนหน้าจอ ตอนปริ้นซ่อนไว้แล้วใช้ตารางสะอาดๆ ด้านล่างแทน */}
+        <div className="rounded-2xl bg-white p-4 shadow-card print:hidden">
           <p className="mb-2 text-xs font-bold text-gray-700">รายการสินค้า ({po.items.length} รายการ)</p>
       {canEditPrice && (
         <p className="-mt-1 mb-2 text-[11px] text-gray-400">
@@ -445,10 +457,58 @@ export default function PurchaseOrderDetailPage() {
         )}
         </div>
 
+        {/* ตารางรายการสำหรับปริ้นโดยเฉพาะ — จัดคอลัมน์เรียบร้อย ไม่มีปุ่ม/ช่องกรอกที่กดไม่ได้อยู่แล้วตอนอยู่บนกระดาษ */}
+        <div className="hidden print:block">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b-2 border-gray-800 text-left">
+                <th className="py-1.5 pr-2 font-bold text-gray-700">รายการ</th>
+                <th className="py-1.5 px-2 text-right font-bold text-gray-700">จำนวน</th>
+                <th className="py-1.5 px-2 text-left font-bold text-gray-700">หน่วย</th>
+                <th className="py-1.5 px-2 text-right font-bold text-gray-700">ราคา/หน่วย</th>
+                <th className="py-1.5 pl-2 text-right font-bold text-gray-700">รวม</th>
+              </tr>
+            </thead>
+            <tbody>
+              {po.items.map((it) => {
+                const matchedStockItem = it.stockItemId ? stockItems.find((s) => s.id === it.stockItemId) : undefined;
+                const stockPackNote = matchedStockItem?.packNote;
+                return (
+                  <tr key={it.id} className="border-b border-gray-200 print:break-inside-avoid">
+                    <td className="py-1.5 pr-2">
+                      {it.itemName}
+                      {stockPackNote && <div className="text-[10px] text-gray-400">📝 {stockPackNote}</div>}
+                    </td>
+                    <td className="py-1.5 px-2 text-right">{it.quantity}</td>
+                    <td className="py-1.5 px-2 text-left text-gray-500">{it.unit}</td>
+                    <td className="py-1.5 px-2 text-right">{it.unitPrice.toLocaleString()}</td>
+                    <td className="py-1.5 pl-2 text-right font-bold">{(it.quantity * it.unitPrice).toLocaleString()}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={4} className="pt-2 text-right text-sm font-bold text-gray-700">
+                  รวมทั้งหมด
+                </td>
+                <td className="pt-2 pl-2 text-right text-sm font-extrabold text-gray-900">{total.toLocaleString()} บาท</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <button
+          onClick={handlePrint}
+          className="no-print w-full rounded-2xl border border-gray-200 bg-white py-3 text-sm font-bold text-gray-700 active:bg-gray-50"
+        >
+          🖨️ ปริ้นใบสั่งซื้อ
+        </button>
+
         <button
           onClick={handleDownloadImage}
           disabled={generatingImage}
-          className="w-full rounded-2xl border border-brand-200 bg-brand-50 py-3 text-sm font-bold text-brand-700 active:bg-brand-100 disabled:opacity-50"
+          className="no-print w-full rounded-2xl border border-brand-200 bg-brand-50 py-3 text-sm font-bold text-brand-700 active:bg-brand-100 disabled:opacity-50"
         >
           {generatingImage ? 'กำลังสร้างรูปภาพ...' : '📷 บันทึกเป็นรูปภาพ (ส่งให้ผู้ขาย)'}
         </button>
@@ -456,13 +516,13 @@ export default function PurchaseOrderDetailPage() {
         <button
           onClick={handleShareImage}
           disabled={sharingImage}
-          className="mt-2 w-full rounded-2xl bg-[#06C755] py-3 text-sm font-bold text-white active:bg-[#05b34c] disabled:opacity-50"
+          className="no-print mt-2 w-full rounded-2xl bg-[#06C755] py-3 text-sm font-bold text-white active:bg-[#05b34c] disabled:opacity-50"
         >
           {sharingImage ? 'กำลังเตรียมรูปภาพ...' : '💬 แชร์ไปยัง LINE'}
         </button>
 
         {canManage && (next || canCancel) && (
-          <div className="space-y-2">
+          <div className="no-print space-y-2">
             {next && (
               <button onClick={handleAdvance} className={`w-full rounded-2xl py-3.5 text-sm font-bold text-white ${next.className}`}>
                 {next.label}
@@ -479,6 +539,12 @@ export default function PurchaseOrderDetailPage() {
           </div>
         )}
       </main>
+
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 15mm; }
+        }
+      `}</style>
     </div>
   );
 }

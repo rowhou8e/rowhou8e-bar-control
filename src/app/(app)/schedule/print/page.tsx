@@ -36,12 +36,6 @@ export default function SchedulePrintPage() {
     setYear(y);
   }
 
-  function roleAbbrev(role: string): string {
-    if (role === 'owner') return 'จนง.';
-    if (role === 'manager') return 'ผจก.';
-    return '';
-  }
-
   async function handleExportImage() {
     if (!exportRef.current) return;
     setExporting(true);
@@ -132,16 +126,14 @@ export default function SchedulePrintPage() {
               const overflowOffList = cell.dateStr
                 ? employeesOffOnDate(cell.dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries)
                 : [];
-              const overflowNames = overflowOffList
-                .map(({ employee: e }) => (e.role === 'staff' ? e.nickname : `${e.nickname} (${roleAbbrev(e.role)})`))
-                .join(', ');
+              const overflowNames = overflowOffList.map(({ employee: e }) => e.nickname).join(', ');
               return (
                 <div
                   key={idx}
                   style={{
                     border: '1px solid #F3F4F6',
                     borderRadius: '6px',
-                    minHeight: '78px',
+                    minHeight: '92px',
                     padding: '5px 7px',
                     background: '#FAFAFA',
                     overflow: 'hidden',
@@ -149,7 +141,9 @@ export default function SchedulePrintPage() {
                 >
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#D1D5DB' }}>{cell.date?.getDate()}</span>
                   {overflowNames && (
-                    <p style={{ margin: '3px 0 0', fontSize: '9px', color: '#D1D5DB', lineHeight: 1.5 }}>หยุด: {overflowNames}</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '12px', fontWeight: 600, color: '#D1D5DB', lineHeight: 1.4 }}>
+                      หยุด: {overflowNames}
+                    </p>
                   )}
                 </div>
               );
@@ -158,9 +152,7 @@ export default function SchedulePrintPage() {
             const isToday = dateStr === todayStr;
             const badges = specialDaysForDate(dateStr, specialDays);
             const offList = employeesOffOnDate(dateStr, cell.weekday, activeEmployees, weeklyPatterns, workCalendarEntries);
-            const names = offList
-              .map(({ employee: e }) => (e.role === 'staff' ? e.nickname : `${e.nickname} (${roleAbbrev(e.role)})`))
-              .join(', ');
+            const names = offList.map(({ employee: e }) => e.nickname).join(', ');
 
             return (
               <div
@@ -168,7 +160,7 @@ export default function SchedulePrintPage() {
                 style={{
                   border: isToday ? '2px solid #424242' : '1px solid #E5E7EB',
                   borderRadius: '6px',
-                  minHeight: '78px',
+                  minHeight: '92px',
                   padding: '5px 7px',
                   background: isToday || badges.length > 0 ? '#F5F5F5' : '#fff',
                   display: 'flex',
@@ -213,7 +205,9 @@ export default function SchedulePrintPage() {
                     })()}
                 </div>
                 {names && (
-                  <p style={{ margin: '3px 0 0', fontSize: '9px', color: '#6B7280', lineHeight: 1.5 }}>หยุด: {names}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: 700, color: '#374151', lineHeight: 1.4 }}>
+                    หยุด: {names}
+                  </p>
                 )}
               </div>
             );

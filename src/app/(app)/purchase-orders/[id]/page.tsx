@@ -68,11 +68,16 @@ export default function PurchaseOrderDetailPage() {
     .filter((it) => it.active && it.supplierId === po.supplierId)
     .sort((a, b) => a.name.localeCompare(b.name, 'th'));
 
+  // ราคาที่เติมให้อัตโนมัติตอนเลือกวัตถุดิบ คือ "ราคารวม" โดยคูณราคาต่อหน่วยล่าสุดกับจำนวนที่กรอกไว้ตอนนั้น
+  // (ไม่ใช่ราคาต่อหน่วยตรงๆ เพราะช่องราคาด้านล่างให้พนักงานกรอกเป็นยอดรวมแล้วให้ระบบหารเอง)
   function defaultPriceFor(stockItemId: string): number | '' {
     const latest = latestSupplierPricesForItem(supplierItemPrices, stockItemId).find(
       (p) => p.supplierId === po!.supplierId
     );
-    return latest ? latest.price : '';
+    if (!latest) return '';
+    const qty = Number(newItemQty);
+    const effectiveQty = Number.isFinite(qty) && qty > 0 ? qty : 1;
+    return latest.price * effectiveQty;
   }
 
   async function handleAddItem() {
@@ -80,9 +85,11 @@ export default function PurchaseOrderDetailPage() {
     const stockItem = stockItems.find((it) => it.id === newItemStockId);
     if (!stockItem) return;
     const quantity = Number(newItemQty);
-    const unitPrice = Number(newItemPrice);
+    const totalPrice = Number(newItemPrice);
     if (!Number.isFinite(quantity) || quantity <= 0) return;
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) return;
+    if (!Number.isFinite(totalPrice) || totalPrice < 0) return;
+    // พนักงานกรอก "ราคารวม" ของรายการนี้ ระบบหารด้วยจำนวนเพื่อเก็บเป็นราคาต่อหน่วยตามปกติ (เหมือนตอนแก้ไขราคารายการที่มีอยู่แล้ว)
+    const unitPrice = totalPrice / quantity;
     setAddingItem(true);
     try {
       await store.addPurchaseOrderItem({
@@ -366,6 +373,7 @@ export default function PurchaseOrderDetailPage() {
         {po.status === 'draft' && (
           <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
             <p className="text-xs font-bold text-gray-700">เพิ่มรายการวัตถุดิบจาก{supplier?.name ?? 'ผู้ขายรายนี้'}</p>
+            <p className="-mt-1 text-[11px] text-gray-400">กรอกจำนวนและราคารวมของรายการนี้ — ระบบจะคำนวณราคาต่อหน่วยให้เอง</p>
             {supplierStockItems.length === 0 ? (
               <p className="text-[11px] text-gray-400">ไม่มีวัตถุดิบที่ผูกกับผู้ขายรายนี้ — ตั้งค่าผู้ขายของวัตถุดิบได้ที่หน้าตั้งค่า</p>
             ) : (
@@ -405,7 +413,8 @@ export default function PurchaseOrderDetailPage() {
                     step="0.01"
                     value={newItemPrice}
                     onChange={(e) => setNewItemPrice(e.target.value)}
-                    placeholder="ราคา/หน่วย"
+                    placeholder="ราคารวม"
+                    title="ราคารวมของรายการนี้ — ระบบจะหารด้วยจำนวนให้เป็นราคาต่อหน่วยเอง"
                     className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-right text-xs text-gray-700"
                   />
                   <span className="text-[11px] text-gray-400">บาท</span>
@@ -418,6 +427,11 @@ export default function PurchaseOrderDetailPage() {
                   {addingItem ? 'กำลังเพิ่ม...' : '+ เพิ่ม'}
                   </button>
                 </div>
+                {newItemQty && newItemPrice && Number(newItemQty) > 0 && (
+                  <p className="text-[10px] text-gray-400">
+                    = {(Number(newItemPrice) / Number(newItemQty)).toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท/หน่วย
+                  </p>
+                )}
               </div>
             )}
 

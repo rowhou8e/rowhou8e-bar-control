@@ -8,7 +8,7 @@ import { generateLiveNotifications, liveNotificationStationId } from '@/lib/deri
 const navItems = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: HomeIcon },
   { href: '/checklist', label: 'เช็กลิสต์', icon: ChecklistIcon },
-  { href: '/milk', label: 'ออร์เดอร์เพิ่ม', icon: MilkIcon },
+  { href: '/purchase-orders/report', label: 'ดูสรุปรายเดือน', icon: ReportIcon },
   { href: '/order', label: 'สั่งสินค้า', icon: OrderIcon },
   { href: '/schedule', label: 'ปฏิทิน', icon: ScheduleIcon },
   { href: '/notifications', label: 'แจ้งเตือน', icon: BellIcon },
@@ -96,10 +96,11 @@ function ChecklistIcon({ active }: { active: boolean }) {
     </svg>
   );
 }
-function MilkIcon({ active }: { active: boolean }) {
+function ReportIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={iconBase(active)} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 2h6M10 2v4l-3 4v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V10l-3-4V2" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M8 17V11M12 17V7M16 17v-4" />
     </svg>
   );
 }
